@@ -686,217 +686,221 @@ merged_data <- merged_data %>%
 
 ```{r Friday Volume Opportunity Analysis by Month}
 
-# date_start <- as.Date("2025-12-29")
-# date_end <- as.Date(Sys.Date() - 1)
-# date_end <- date_end - as.integer(format(date_end, "%u"))
-# 
-# 
-# 
-# ## Arrived Volume and No Show Rate Comparison ----------------------------------
-# 
-# volume_no_show_month <- access_raw_tbl %>%
-#   left_join(clarity_ser_tbl %>% select(PROV_ID, PROV_TYPE)) %>%
-#   # filter(PROV_TYPE == "Physician") %>%
-#   left_join(clarity_ser_2_tbl %>% dplyr::select(PROV_ID, NPI)) %>%
-#   # filter(!is.na(SITE)) %>%
-#   # filter(SITE %in% c("MSUS", "MSH- AMBULATORY CARE", "NETWORK", "MSW", "MSH-MSDFP",
-#   #                    "MSDMG", "MSB", "MSM", "MSQ", "MSBI", "MSSN", "NYEE")) %>%
-#   mutate(lead_days = CONTACT_DATE - APPT_MADE_DATE) %>%
-#   mutate(cancel_lead_days = APPT_DTTM - APPT_CANC_DTTM) %>%
-#   # mutate(lead_days =  as.numeric(difftime(as.Date(APPT_MADE_DATE), as.Date(CONTACT_DATE), units = "days"))) %>%
-#   # mutate(SPECIALTY_GRP = ifelse(DEPT_SPECIALTY_NAME %in%
-#   #                                 c("Adolescent Medicine", "Community and Preventive Medicine",
-#   #                                   "Family Medicine", "Internal Medicine", "Pediatrics", "Geriatrics", "Gerontology", "Urgent Care"), "Primary Care", "Specialty")) %>%
-#   filter(DERIVED_STATUS_DESC == "Arrived" |
-#            DERIVED_STATUS_DESC == "No Show" |
-#            (DERIVED_STATUS_DESC == "Canceled"  & cancel_lead_days <= 1) |
-#            (DERIVED_STATUS_DESC == "Rescheduled" & cancel_lead_days <= 1)) %>%
-#   mutate(DERIVED_STATUS_DESC = ifelse(DERIVED_STATUS_DESC == "No Show", "No_Show", DERIVED_STATUS_DESC)) %>%
-#   mutate(appt_year = year(CONTACT_DATE),
-#          appt_month = month(CONTACT_DATE),
-#          appt_week = sql("TRUNC(CONTACT_DATE, 'IW')"),
-#          appt_day = sql("TRIM(TO_CHAR(CONTACT_DATE, 'DAY'))")) %>%
-#   mutate(appt_made_year = year(APPT_MADE_DATE),
-#          appt_made_month = month(APPT_MADE_DATE)) %>%
-#   mutate(visit_type = ifelse(is.na(VISIT_GROUP_NUM), "ESTABLISHED", "NEW")) %>%
-#   mutate(lead_14days = ifelse(lead_days <= 14, "lead_14days", "lead_14days_more")) %>%
-#   filter(CONTACT_DATE >= TO_DATE(date_start , "YYYY-MM-DD HH24:MI:SS")) %>%
-#   filter(CONTACT_DATE <= TO_DATE(date_end , "YYYY-MM-DD HH24:MI:SS")) %>%
-#   # dplyr::select(SITE, DEPT_SPECIALTY_NAME, DEPARTMENT_NAME, DEPARTMENT_ID, PROV_NAME_WID, PAT_ENC_CSN_ID, APPT_STATUS_NAME, CANCEL_LEAD_HOURS, CANCEL_INITIATOR) %>%
-#   group_by(SITE, DEPT_SPECIALTY_NAME, DEPARTMENT_NAME, DEPARTMENT_ID, PROV_ID, NPI, PROV_NAME_WID, PROV_TYPE, 
-#            appt_year, appt_month, appt_day,
-#            # appt_day, CONTACT_DATE,
-#            DERIVED_STATUS_DESC) %>%
-#   summarise(total = n()) %>%
-#   collect() %>%
-#   pivot_wider(names_from = c("DERIVED_STATUS_DESC", "appt_day"),
-#               values_from = total,
-#               values_fill = 0)
-# 
-# 
-# volume_no_show_month <- volume_no_show_month %>%
-#   mutate(Arrived_AVG = sum(Arrived_MONDAY, Arrived_TUESDAY, Arrived_WEDNESDAY, Arrived_THURSDAY)/4) %>%
-#   mutate(Arrived_VAR = Arrived_FRIDAY - Arrived_AVG,
-#          Arrived_VAR_PERC = Arrived_VAR/Arrived_AVG) %>%
-#   mutate(No_Show_AVG = sum(No_Show_MONDAY, No_Show_TUESDAY, No_Show_WEDNESDAY, No_Show_THURSDAY)/4,
-#          Canceled_AVG = sum(Canceled_MONDAY, Canceled_TUESDAY, Canceled_WEDNESDAY, Canceled_THURSDAY)/4,
-#          Rescheduled_AVG = sum(Rescheduled_MONDAY, Rescheduled_TUESDAY, Rescheduled_WEDNESDAY, Rescheduled_THURSDAY)/4) %>%
-#   mutate(No_Show_Rate_AVG = (No_Show_AVG + Canceled_AVG + Rescheduled_AVG) / (No_Show_AVG + Canceled_AVG + Rescheduled_AVG + Arrived_AVG),
-#          No_Show_Rate_FRIDAY = (No_Show_FRIDAY + Canceled_FRIDAY + Rescheduled_FRIDAY) / (No_Show_FRIDAY + Canceled_FRIDAY + Rescheduled_FRIDAY + Arrived_FRIDAY))
-# 
-# 
-# 
-# ## Session Count ---------------------------------------------------------------
-# sessions_month <- access_raw_tbl %>%
-#   filter(CONTACT_DATE >= TO_DATE(date_start , "YYYY-MM-DD HH24:MI:SS")) %>%
-#   filter(CONTACT_DATE <= TO_DATE(date_end , "YYYY-MM-DD HH24:MI:SS")) %>%
-#   mutate(cancel_lead_days = APPT_DTTM - APPT_CANC_DTTM) %>%
-#   filter(DERIVED_STATUS_DESC == "Arrived" |
-#            DERIVED_STATUS_DESC == "No Show" |
-#            (DERIVED_STATUS_DESC == "Canceled"  & cancel_lead_days <= 1) |
-#            (DERIVED_STATUS_DESC == "Rescheduled" & cancel_lead_days <= 1)) %>%
-#   mutate(appt_year = year(CONTACT_DATE),
-#          appt_month = month(CONTACT_DATE),
-#          appt_week = sql("TRUNC(CONTACT_DATE, 'IW')"),
-#          appt_day = sql("TRIM(TO_CHAR(CONTACT_DATE, 'DAY'))")) %>%
-#   group_by(DEPARTMENT_ID, PROV_ID, appt_year, appt_week, appt_day, CONTACT_DATE) %>%
-#   summarise(
-#     first_appt = min(APPT_DTTM),
-#     last_appt  = max(APPT_DTTM),
-#     first_last_appt_hour = (max(APPT_DTTM) - min(APPT_DTTM)) * 24,
-#     .groups = "drop"
-#   ) %>%
-#   mutate(total = ifelse(first_last_appt_hour<2,0, ifelse(first_last_appt_hour<5,1, ifelse(first_last_appt_hour<9,2,3)))) %>%
-#   group_by(DEPARTMENT_ID, PROV_ID, appt_year, appt_month, appt_day) %>%
-#   summarise(total = sum(total, na.rm = T)) %>%
-#   collect() %>%
-#   mutate(session_cnt = "session_cnt") %>%
-#   pivot_wider(names_from = c("session_cnt", "appt_day"),
-#               values_from = total,
-#               values_fill = 0) %>%
-#   mutate(session_cnt_AVG = sum(session_cnt_MONDAY + session_cnt_TUESDAY + session_cnt_WEDNESDAY + session_cnt_THURSDAY)/4) %>%
-#   mutate(session_cnt_VAR = session_cnt_FRIDAY - session_cnt_AVG,
-#          session_cnt_VAR_PERC = session_cnt_VAR/session_cnt_AVG)
-# 
-#   
-# 
-# ## Physician Count ---------------------------------------------------------------
-# physicians_month <- access_raw_tbl %>%
-#   filter(CONTACT_DATE >= TO_DATE(date_start , "YYYY-MM-DD HH24:MI:SS")) %>%
-#   filter(CONTACT_DATE <= TO_DATE(date_end , "YYYY-MM-DD HH24:MI:SS")) %>%
-#   mutate(cancel_lead_days = APPT_DTTM - APPT_CANC_DTTM) %>%
-#   filter(DERIVED_STATUS_DESC == "Arrived" |
-#            DERIVED_STATUS_DESC == "No Show" |
-#            (DERIVED_STATUS_DESC == "Canceled"  & cancel_lead_days <= 1) |
-#            (DERIVED_STATUS_DESC == "Rescheduled" & cancel_lead_days <= 1)) %>%
-#   mutate(appt_year = year(CONTACT_DATE),
-#          appt_month = month(CONTACT_DATE),
-#          appt_week = sql("TRUNC(CONTACT_DATE, 'IW')"),
-#          appt_day = sql("TRIM(TO_CHAR(CONTACT_DATE, 'DAY'))")) %>%
-#   group_by(DEPARTMENT_ID, PROV_ID, appt_year, appt_month, appt_day) %>%
-#   summarise(total = n_distinct(PROV_ID)) %>%
-#   collect() %>%
-#   mutate(md_cnt = "md_cnt") %>%
-#   pivot_wider(names_from = c("md_cnt", "appt_day"),
-#               values_from = total,
-#               values_fill = 0) %>%
-#   mutate(md_cnt_AVG = sum(md_cnt_MONDAY + md_cnt_TUESDAY + md_cnt_WEDNESDAY + md_cnt_THURSDAY)/4) %>%
-#   mutate(md_cnt_VAR = md_cnt_FRIDAY - md_cnt_AVG,
-#          md_cnt_VAR_PERC = md_cnt_VAR/md_cnt_AVG)
-#   
-# 
-# # Unfilled Slots ---------------------------------------------------------------
-# grp_mapping <- data.frame("SITE" = c("NETWORK", "OTHER", "MSH-MSDFP", "MSUS", 
-#                                         "MSDMG", "MSBI", "MSW", "MSHP", "MSM", "MSH- AMBULATORY CARE",
-#                                         "NYEE", "MS NOW", "MSQ", "MSSN", "MSB"),
-#                              "RPT_GRP_SEVNTEEN_C" = c(2, 3,4, 6, 
-#                                                       7, 8, 9, 10, 11, 12,
-#                                                       13, 14, 15, 19, 38))
-# 
-# 
-# unfilled_slots_month <- tbl(conn2, "V_AVAILABILITY") %>%
-#   # filter(DEPARTMENT_ID == 8001059) %>%
-#   # filter(PROV_ID == 377151) %>%
-#   # filter(year(SLOT_BEGIN_TIME) ==  2026) %>%
-#   # filter(month(SLOT_BEGIN_TIME) == 1) %>%
-#   # left_join(clarity_ser_2_tbl %>% dplyr::select(PROV_ID, NPI)) %>%
-#   filter(SLOT_BEGIN_TIME >= TO_DATE(date_start , "YYYY-MM-DD HH24:MI:SS")) %>%
-#   filter(SLOT_BEGIN_TIME <= TO_DATE(date_end , "YYYY-MM-DD HH24:MI:SS")) %>%
-#   mutate(slot_date = sql("TRUNC(SLOT_BEGIN_TIME)"),
-#          slot_year = year(SLOT_BEGIN_TIME),
-#          slot_month = month(SLOT_BEGIN_TIME),
-#          slot_day = sql("TO_CHAR(TRUNC(SLOT_BEGIN_TIME), 'FMDAY')"),
-#          slot_week = sql("TRUNC(SLOT_BEGIN_TIME, 'IW')")) %>%
-#   filter(TIME_HELD_YN == "N" | TIME_UNAVAIL_YN == "N") %>%
-#   filter(SLOT_LENGTH >= 10) %>%
-#   filter(as.numeric(SLOT_HOUR) >= 7 & as.numeric(SLOT_HOUR) <= 21) %>%
-# 
-#   # Exclude any dates with 0 appts scheduled (false template)
-#   group_by(DEPARTMENT_ID, PROV_ID, slot_date) %>%
-#   mutate(apts_scheduled = sum(NUM_APTS_SCHEDULED, na.rm = T)) %>%
-#   filter(apts_scheduled > 0) %>%
-#   filter(APPT_NUMBER == 0) %>%
-#   filter(ORG_REG_OPENINGS - NUM_APTS_SCHEDULED > 0) %>%
-# 
-#   group_by(DEPARTMENT_ID, PROV_ID, slot_year, slot_month, slot_day) %>%
-#   summarise(total = n()) %>%
-#   collect() %>%
-#   mutate(unfilled_cnt = "unfilled_cnt") %>%
-#   pivot_wider(names_from = c("unfilled_cnt", "slot_day"),
-#               values_from = total,
-#               values_fill = 0) %>%
-#   mutate(unfilled_cnt_AVG = sum(unfilled_cnt_MONDAY + unfilled_cnt_TUESDAY + unfilled_cnt_WEDNESDAY + unfilled_cnt_THURSDAY)/4) %>%
-#   mutate(unfilled_cnt_VAR = unfilled_cnt_FRIDAY - unfilled_cnt_AVG,
-#          unfilled_cnt_VAR_PERC = unfilled_cnt_VAR/unfilled_cnt_AVG)
-#   
-# 
-#   
-#   
-# ## Merged Data -----------------------------------------------------------------
-# merged_data_month <- full_join(volume_no_show_month, sessions_month)
-# merged_data_month <- full_join(merged_data_month, physicians_month)
-# merged_data_month <- left_join(merged_data_month, unfilled_slots_month,
-#                          by = c("DEPARTMENT_ID" = "DEPARTMENT_ID",
-#                                 "PROV_ID" = "PROV_ID",
-#                                 "appt_year" = "slot_year",
-#                                 "appt_month" = "slot_month"))
-# 
-# 
-# merged_data_month <- merged_data_month %>%
-#   left_join(location %>% dplyr::select(DEPARTMENT_ID, STANDARD_ADDRESS)) %>%
-#   left_join(holidays %>% dplyr::select(holiday, week_start), 
-#             by = c("appt_" = "week_start")) %>%
-#   mutate(appt_week = as.character(appt_week)) %>%
-#   arrange(appt_year, appt_month, STANDARD_ADDRESS, DEPT_SPECIALTY_NAME, DEPARTMENT_NAME, PROV_TYPE, PROV_NAME_WID)
-# 
-# # require(openxlsx)
-# # write.xlsx(friday_data, "Friday Volume_040926.xlsx")
-# 
-# 
-# col_order <- c("appt_year", "appt_month", "holiday",
-#                "SITE", "STANDARD_ADDRESS",  "DEPT_SPECIALTY_NAME", "DEPARTMENT_NAME", "DEPARTMENT_ID", "PROV_TYPE", "PROV_ID", "NPI", "PROV_NAME_WID",
-#                "Arrived_AVG", "Arrived_MONDAY", "Arrived_TUESDAY", "Arrived_WEDNESDAY", "Arrived_THURSDAY", "Arrived_FRIDAY", "Arrived_SATURDAY", "Arrived_SUNDAY",
-#                "Arrived_VAR", "Arrived_VAR_PERC",
-#                "md_cnt_AVG", "md_cnt_MONDAY", "md_cnt_TUESDAY", "md_cnt_WEDNESDAY", "md_cnt_THURSDAY", "md_cnt_FRIDAY", "md_cnt_SATURDAY", "md_cnt_SUNDAY",
-#                "md_cnt_VAR", "md_cnt_VAR_PERC",
-#                "session_cnt_AVG", "session_cnt_MONDAY", "session_cnt_TUESDAY", "session_cnt_WEDNESDAY", "session_cnt_THURSDAY", 
-#                "session_cnt_FRIDAY", "session_cnt_SATURDAY", "session_cnt_SUNDAY",
-#                "session_cnt_VAR", "session_cnt_VAR_PERC",
-#                "unfilled_cnt_AVG", "unfilled_cnt_MONDAY", "unfilled_cnt_TUESDAY", "unfilled_cnt_WEDNESDAY", "unfilled_cnt_THURSDAY", 
-#                "unfilled_cnt_FRIDAY", "unfilled_cnt_SATURDAY", "unfilled_cnt_SUNDAY",
-#                "unfilled_cnt_VAR", "unfilled_cnt_VAR_PERC",
-#                "Canceled_AVG", "Canceled_MONDAY", "Canceled_TUESDAY", "Canceled_WEDNESDAY", "Canceled_THURSDAY", "Canceled_FRIDAY", "Canceled_SATURDAY", "Canceled_SUNDAY",
-#                "Rescheduled_AVG", "Rescheduled_MONDAY", "Rescheduled_TUESDAY", "Rescheduled_WEDNESDAY", "Rescheduled_THURSDAY",
-#                "Rescheduled_FRIDAY", "Rescheduled_SATURDAY", "Rescheduled_SUNDAY",
-#                "No_Show_AVG", "No_Show_MONDAY", "No_Show_TUESDAY", "No_Show_WEDNESDAY", "No_Show_THURSDAY", "No_Show_FRIDAY", "No_Show_SATURDAY", "No_Show_SUNDAY",
-#                "No_Show_Rate_AVG", "No_Show_Rate_FRIDAY")
-# 
-# 
-# # setdiff(col_order, colnames(merged_data))
-# 
-# 
-# merged_data <- merged_data %>%
-#   dplyr::select(col_order)
+date_start <- as.Date("2025-12-29")
+date_end <- as.Date(Sys.Date() - 1)
+date_end <- date_end - as.integer(format(date_end, "%u"))
+
+
+
+## Arrived Volume and No Show Rate Comparison ----------------------------------
+
+volume_no_show_month <- access_raw_tbl %>%
+  left_join(clarity_ser_tbl %>% select(PROV_ID, PROV_TYPE)) %>%
+  # filter(PROV_TYPE == "Physician") %>%
+  left_join(clarity_ser_2_tbl %>% dplyr::select(PROV_ID, NPI)) %>%
+  # filter(!is.na(SITE)) %>%
+  # filter(SITE %in% c("MSUS", "MSH- AMBULATORY CARE", "NETWORK", "MSW", "MSH-MSDFP",
+  #                    "MSDMG", "MSB", "MSM", "MSQ", "MSBI", "MSSN", "NYEE")) %>%
+  mutate(lead_days = CONTACT_DATE - APPT_MADE_DATE) %>%
+  mutate(cancel_lead_days = APPT_DTTM - APPT_CANC_DTTM) %>%
+  # mutate(lead_days =  as.numeric(difftime(as.Date(APPT_MADE_DATE), as.Date(CONTACT_DATE), units = "days"))) %>%
+  # mutate(SPECIALTY_GRP = ifelse(DEPT_SPECIALTY_NAME %in%
+  #                                 c("Adolescent Medicine", "Community and Preventive Medicine",
+  #                                   "Family Medicine", "Internal Medicine", "Pediatrics", "Geriatrics", "Gerontology", "Urgent Care"), "Primary Care", "Specialty")) %>%
+  filter(DERIVED_STATUS_DESC == "Arrived" |
+           DERIVED_STATUS_DESC == "No Show" |
+           (DERIVED_STATUS_DESC == "Canceled"  & cancel_lead_days <= 1) |
+           (DERIVED_STATUS_DESC == "Rescheduled" & cancel_lead_days <= 1)) %>%
+  mutate(DERIVED_STATUS_DESC = ifelse(DERIVED_STATUS_DESC == "No Show", "No_Show", DERIVED_STATUS_DESC)) %>%
+  mutate(appt_year = year(CONTACT_DATE),
+         appt_month = month(CONTACT_DATE),
+         appt_week = sql("TRUNC(CONTACT_DATE, 'IW')"),
+         appt_day = sql("TRIM(TO_CHAR(CONTACT_DATE, 'DAY'))")) %>%
+  mutate(appt_made_year = year(APPT_MADE_DATE),
+         appt_made_month = month(APPT_MADE_DATE)) %>%
+  mutate(visit_type = ifelse(is.na(VISIT_GROUP_NUM), "ESTABLISHED", "NEW")) %>%
+  mutate(lead_14days = ifelse(lead_days <= 14, "lead_14days", "lead_14days_more")) %>%
+  filter(CONTACT_DATE >= TO_DATE(date_start , "YYYY-MM-DD HH24:MI:SS")) %>%
+  filter(CONTACT_DATE <= TO_DATE(date_end , "YYYY-MM-DD HH24:MI:SS")) %>%
+  filter(year(CONTACT_DATE) == 2026) %>%
+  # dplyr::select(SITE, DEPT_SPECIALTY_NAME, DEPARTMENT_NAME, DEPARTMENT_ID, PROV_NAME_WID, PAT_ENC_CSN_ID, APPT_STATUS_NAME, CANCEL_LEAD_HOURS, CANCEL_INITIATOR) %>%
+  group_by(SITE, DEPT_SPECIALTY_NAME, DEPARTMENT_NAME, DEPARTMENT_ID, PROV_ID, NPI, PROV_NAME_WID, PROV_TYPE,
+           appt_year, appt_month, appt_day,
+           # appt_day, CONTACT_DATE,
+           DERIVED_STATUS_DESC) %>%
+  summarise(total = n()) %>%
+  collect() %>%
+  pivot_wider(names_from = c("DERIVED_STATUS_DESC", "appt_day"),
+              values_from = total,
+              values_fill = 0)
+
+
+volume_no_show_month <- volume_no_show_month %>%
+  mutate(Arrived_AVG = sum(Arrived_MONDAY, Arrived_TUESDAY, Arrived_WEDNESDAY, Arrived_THURSDAY)/4) %>%
+  mutate(Arrived_VAR = Arrived_FRIDAY - Arrived_AVG,
+         Arrived_VAR_PERC = Arrived_VAR/Arrived_AVG) %>%
+  mutate(No_Show_AVG = sum(No_Show_MONDAY, No_Show_TUESDAY, No_Show_WEDNESDAY, No_Show_THURSDAY)/4,
+         Canceled_AVG = sum(Canceled_MONDAY, Canceled_TUESDAY, Canceled_WEDNESDAY, Canceled_THURSDAY)/4,
+         Rescheduled_AVG = sum(Rescheduled_MONDAY, Rescheduled_TUESDAY, Rescheduled_WEDNESDAY, Rescheduled_THURSDAY)/4) %>%
+  mutate(No_Show_Rate_AVG = (No_Show_AVG + Canceled_AVG + Rescheduled_AVG) / (No_Show_AVG + Canceled_AVG + Rescheduled_AVG + Arrived_AVG),
+         No_Show_Rate_FRIDAY = (No_Show_FRIDAY + Canceled_FRIDAY + Rescheduled_FRIDAY) / (No_Show_FRIDAY + Canceled_FRIDAY + Rescheduled_FRIDAY + Arrived_FRIDAY))
+
+
+
+## Session Count ---------------------------------------------------------------
+sessions_month <- access_raw_tbl %>%
+  filter(CONTACT_DATE >= TO_DATE(date_start , "YYYY-MM-DD HH24:MI:SS")) %>%
+  filter(CONTACT_DATE <= TO_DATE(date_end , "YYYY-MM-DD HH24:MI:SS")) %>%
+  filter(year(CONTACT_DATE) == 2026) %>%
+  mutate(cancel_lead_days = APPT_DTTM - APPT_CANC_DTTM) %>%
+  filter(DERIVED_STATUS_DESC == "Arrived" |
+           DERIVED_STATUS_DESC == "No Show" |
+           (DERIVED_STATUS_DESC == "Canceled"  & cancel_lead_days <= 1) |
+           (DERIVED_STATUS_DESC == "Rescheduled" & cancel_lead_days <= 1)) %>%
+  mutate(appt_year = year(CONTACT_DATE),
+         appt_month = month(CONTACT_DATE),
+         appt_week = sql("TRUNC(CONTACT_DATE, 'IW')"),
+         appt_day = sql("TRIM(TO_CHAR(CONTACT_DATE, 'DAY'))")) %>%
+  group_by(DEPARTMENT_ID, PROV_ID, appt_year, appt_month, appt_day, CONTACT_DATE) %>%
+  summarise(
+    first_appt = min(APPT_DTTM),
+    last_appt  = max(APPT_DTTM),
+    first_last_appt_hour = (max(APPT_DTTM) - min(APPT_DTTM)) * 24,
+    .groups = "drop"
+  ) %>%
+  mutate(total = ifelse(first_last_appt_hour<2,0, ifelse(first_last_appt_hour<5,1, ifelse(first_last_appt_hour<9,2,3)))) %>%
+  group_by(DEPARTMENT_ID, PROV_ID, appt_year, appt_month, appt_day) %>%
+  summarise(total = sum(total, na.rm = T)) %>%
+  collect() %>%
+  mutate(session_cnt = "session_cnt") %>%
+  pivot_wider(names_from = c("session_cnt", "appt_day"),
+              values_from = total,
+              values_fill = 0) %>%
+  mutate(session_cnt_AVG = sum(session_cnt_MONDAY + session_cnt_TUESDAY + session_cnt_WEDNESDAY + session_cnt_THURSDAY)/4) %>%
+  mutate(session_cnt_VAR = session_cnt_FRIDAY - session_cnt_AVG,
+         session_cnt_VAR_PERC = session_cnt_VAR/session_cnt_AVG)
+
+
+
+## Physician Count ---------------------------------------------------------------
+physicians_month <- access_raw_tbl %>%
+  filter(CONTACT_DATE >= TO_DATE(date_start , "YYYY-MM-DD HH24:MI:SS")) %>%
+  filter(CONTACT_DATE <= TO_DATE(date_end , "YYYY-MM-DD HH24:MI:SS")) %>%
+  filter(year(CONTACT_DATE) == 2026) %>%
+  mutate(cancel_lead_days = APPT_DTTM - APPT_CANC_DTTM) %>%
+  filter(DERIVED_STATUS_DESC == "Arrived" |
+           DERIVED_STATUS_DESC == "No Show" |
+           (DERIVED_STATUS_DESC == "Canceled"  & cancel_lead_days <= 1) |
+           (DERIVED_STATUS_DESC == "Rescheduled" & cancel_lead_days <= 1)) %>%
+  mutate(appt_year = year(CONTACT_DATE),
+         appt_month = month(CONTACT_DATE),
+         appt_week = sql("TRUNC(CONTACT_DATE, 'IW')"),
+         appt_day = sql("TRIM(TO_CHAR(CONTACT_DATE, 'DAY'))")) %>%
+  group_by(DEPARTMENT_ID, PROV_ID, appt_year, appt_month, appt_day) %>%
+  summarise(total = n_distinct(PROV_ID)) %>%
+  collect() %>%
+  mutate(md_cnt = "md_cnt") %>%
+  pivot_wider(names_from = c("md_cnt", "appt_day"),
+              values_from = total,
+              values_fill = 0) %>%
+  mutate(md_cnt_AVG = sum(md_cnt_MONDAY + md_cnt_TUESDAY + md_cnt_WEDNESDAY + md_cnt_THURSDAY)/4) %>%
+  mutate(md_cnt_VAR = md_cnt_FRIDAY - md_cnt_AVG,
+         md_cnt_VAR_PERC = md_cnt_VAR/md_cnt_AVG)
+
+
+# Unfilled Slots ---------------------------------------------------------------
+grp_mapping <- data.frame("SITE" = c("NETWORK", "OTHER", "MSH-MSDFP", "MSUS",
+                                        "MSDMG", "MSBI", "MSW", "MSHP", "MSM", "MSH- AMBULATORY CARE",
+                                        "NYEE", "MS NOW", "MSQ", "MSSN", "MSB"),
+                             "RPT_GRP_SEVNTEEN_C" = c(2, 3,4, 6,
+                                                      7, 8, 9, 10, 11, 12,
+                                                      13, 14, 15, 19, 38))
+
+
+unfilled_slots_month <- tbl(conn2, "V_AVAILABILITY") %>%
+  # filter(DEPARTMENT_ID == 8001059) %>%
+  # filter(PROV_ID == 377151) %>%
+  # filter(year(SLOT_BEGIN_TIME) ==  2026) %>%
+  # filter(month(SLOT_BEGIN_TIME) == 1) %>%
+  # left_join(clarity_ser_2_tbl %>% dplyr::select(PROV_ID, NPI)) %>%
+  filter(SLOT_BEGIN_TIME >= TO_DATE(date_start , "YYYY-MM-DD HH24:MI:SS")) %>%
+  filter(SLOT_BEGIN_TIME <= TO_DATE(date_end , "YYYY-MM-DD HH24:MI:SS")) %>%
+  filter(year(SLOT_BEGIN_TIME) == 2026) %>%
+  mutate(slot_date = sql("TRUNC(SLOT_BEGIN_TIME)"),
+         slot_year = year(SLOT_BEGIN_TIME),
+         slot_month = month(SLOT_BEGIN_TIME),
+         slot_day = sql("TO_CHAR(TRUNC(SLOT_BEGIN_TIME), 'FMDAY')"),
+         slot_week = sql("TRUNC(SLOT_BEGIN_TIME, 'IW')")) %>%
+  filter(TIME_HELD_YN == "N" | TIME_UNAVAIL_YN == "N") %>%
+  filter(SLOT_LENGTH >= 10) %>%
+  filter(as.numeric(SLOT_HOUR) >= 7 & as.numeric(SLOT_HOUR) <= 21) %>%
+
+  # Exclude any dates with 0 appts scheduled (false template)
+  group_by(DEPARTMENT_ID, PROV_ID, slot_date) %>%
+  mutate(apts_scheduled = sum(NUM_APTS_SCHEDULED, na.rm = T)) %>%
+  filter(apts_scheduled > 0) %>%
+  filter(APPT_NUMBER == 0) %>%
+  filter(ORG_REG_OPENINGS - NUM_APTS_SCHEDULED > 0) %>%
+
+  group_by(DEPARTMENT_ID, PROV_ID, slot_year, slot_month, slot_day) %>%
+  summarise(total = n()) %>%
+  collect() %>%
+  mutate(unfilled_cnt = "unfilled_cnt") %>%
+  pivot_wider(names_from = c("unfilled_cnt", "slot_day"),
+              values_from = total,
+              values_fill = 0) %>%
+  mutate(unfilled_cnt_AVG = sum(unfilled_cnt_MONDAY + unfilled_cnt_TUESDAY + unfilled_cnt_WEDNESDAY + unfilled_cnt_THURSDAY)/4) %>%
+  mutate(unfilled_cnt_VAR = unfilled_cnt_FRIDAY - unfilled_cnt_AVG,
+         unfilled_cnt_VAR_PERC = unfilled_cnt_VAR/unfilled_cnt_AVG)
+
+
+
+
+## Merged Data -----------------------------------------------------------------
+merged_data_month <- full_join(volume_no_show_month, sessions_month)
+merged_data_month <- full_join(merged_data_month, physicians_month)
+merged_data_month <- left_join(merged_data_month, unfilled_slots_month,
+                         by = c("DEPARTMENT_ID" = "DEPARTMENT_ID",
+                                "PROV_ID" = "PROV_ID",
+                                "appt_year" = "slot_year",
+                                "appt_month" = "slot_month"))
+
+
+merged_data_month <- merged_data_month %>%
+  left_join(location %>% dplyr::select(DEPARTMENT_ID, STANDARD_ADDRESS)) %>%
+  # left_join(holidays %>% dplyr::select(holiday, week_start),
+  #           by = c("appt_" = "week_start")) %>%
+  # mutate(appt_week = as.character(appt_week)) %>%
+  arrange(appt_year, appt_month, STANDARD_ADDRESS, DEPT_SPECIALTY_NAME, DEPARTMENT_NAME, PROV_TYPE, PROV_NAME_WID)
+
+# require(openxlsx)
+# write.xlsx(friday_data, "Friday Volume_040926.xlsx")
+
+
+col_order <- c("appt_year", "appt_month", 
+               "SITE", "STANDARD_ADDRESS",  "DEPT_SPECIALTY_NAME", "DEPARTMENT_NAME", "DEPARTMENT_ID", "PROV_TYPE", "PROV_ID", "NPI", "PROV_NAME_WID",
+               "Arrived_AVG", "Arrived_MONDAY", "Arrived_TUESDAY", "Arrived_WEDNESDAY", "Arrived_THURSDAY", "Arrived_FRIDAY", "Arrived_SATURDAY", "Arrived_SUNDAY",
+               "Arrived_VAR", "Arrived_VAR_PERC",
+               "md_cnt_AVG", "md_cnt_MONDAY", "md_cnt_TUESDAY", "md_cnt_WEDNESDAY", "md_cnt_THURSDAY", "md_cnt_FRIDAY", "md_cnt_SATURDAY", "md_cnt_SUNDAY",
+               "md_cnt_VAR", "md_cnt_VAR_PERC",
+               "session_cnt_AVG", "session_cnt_MONDAY", "session_cnt_TUESDAY", "session_cnt_WEDNESDAY", "session_cnt_THURSDAY",
+               "session_cnt_FRIDAY", "session_cnt_SATURDAY", "session_cnt_SUNDAY",
+               "session_cnt_VAR", "session_cnt_VAR_PERC",
+               "unfilled_cnt_AVG", "unfilled_cnt_MONDAY", "unfilled_cnt_TUESDAY", "unfilled_cnt_WEDNESDAY", "unfilled_cnt_THURSDAY",
+               "unfilled_cnt_FRIDAY", "unfilled_cnt_SATURDAY", "unfilled_cnt_SUNDAY",
+               "unfilled_cnt_VAR", "unfilled_cnt_VAR_PERC",
+               "Canceled_AVG", "Canceled_MONDAY", "Canceled_TUESDAY", "Canceled_WEDNESDAY", "Canceled_THURSDAY", "Canceled_FRIDAY", "Canceled_SATURDAY", "Canceled_SUNDAY",
+               "Rescheduled_AVG", "Rescheduled_MONDAY", "Rescheduled_TUESDAY", "Rescheduled_WEDNESDAY", "Rescheduled_THURSDAY",
+               "Rescheduled_FRIDAY", "Rescheduled_SATURDAY", "Rescheduled_SUNDAY",
+               "No_Show_AVG", "No_Show_MONDAY", "No_Show_TUESDAY", "No_Show_WEDNESDAY", "No_Show_THURSDAY", "No_Show_FRIDAY", "No_Show_SATURDAY", "No_Show_SUNDAY",
+               "No_Show_Rate_AVG", "No_Show_Rate_FRIDAY")
+
+
+# setdiff(col_order, colnames(merged_data))
+
+
+merged_data_month <- merged_data_month %>%
+  dplyr::select(col_order)
 
 ```
 
@@ -905,13 +909,13 @@ merged_data <- merged_data %>%
 
 # Friday Volume Performance {.tabset .tabset-fade .tabset-pills}
 *Report run date: `r report_run_date`*<br/>
-*Trakcer excludes any weeks with Mount Sinai observed holidays*<br/>
 ______________________________________________________________________________________________________________________________
 <br/>
 <br/>
 
 
 ## Performance by Week (Physicians Only)
+*Performance by Week excludes any weeks with Mount Sinai observed holidays*<br/>
 ```{r KPI Tracker}
 
 htmltools::browsable(
@@ -959,10 +963,494 @@ reactable(
     wrap = TRUE,
   searchable = TRUE,
 
-  groupBy = c("appt_year", "appt_week","SITE","STANDARD_ADDRESS","DEPT_SPECIALTY_NAME","DEPARTMENT_NAME","PROV_TYPE"),
+  groupBy = c("appt_week","SITE","STANDARD_ADDRESS","DEPT_SPECIALTY_NAME","DEPARTMENT_NAME","PROV_TYPE"),
 
   columnGroups = list(
-    colGroup(name = "", columns = c("appt_year", "appt_week"),
+    colGroup(name = "", columns = c("appt_week"),
+             headerStyle = list(color = "black", fontSize = "15px"),
+             sticky = "left"),
+    colGroup(name = "", columns = c("SITE","STANDARD_ADDRESS","DEPT_SPECIALTY_NAME","DEPARTMENT_NAME","PROV_TYPE", "PROV_NAME_WID"),
+             headerStyle = list(color = "black", fontSize = "15px")),
+    colGroup(name = paste0("Arrived Visits"),
+             columns = c("Arrived_AVG", "Arrived_FRIDAY", "Arrived_VAR", "Arrived_VAR_PERC"),
+             headerStyle = list(background = "#7f7f7f", color = "white", fontSize = "15px")),
+    colGroup(name = paste0("Practicing Physicians"),
+             columns = c("md_cnt_AVG", "md_cnt_FRIDAY", "md_cnt_VAR", "md_cnt_VAR_PERC"),
+             headerStyle = list(background = "#212070", color = "white", fontSize = "15px")),
+    colGroup(name = paste0("Sessions"),
+             columns = c("session_cnt_AVG", "session_cnt_FRIDAY", "session_cnt_VAR", "session_cnt_VAR_PERC"),
+             headerStyle = list(background = "#d80b8c", color = "white", fontSize = "15px")),
+    colGroup(name = paste0("Unfilled Slots"),
+             columns = c("unfilled_cnt_AVG", "unfilled_cnt_FRIDAY", "unfilled_cnt_VAR", "unfilled_cnt_VAR_PERC"),
+             headerStyle = list(background = "#00aeef", color = "white", fontSize = "15px")),
+    colGroup(name = paste0("No Show Rate"),
+             columns = c("No_Show_Rate_AVG", "No_Show_Rate_FRIDAY"),
+             headerStyle = list(background = "#a5a7a5", color = "white", fontSize = "15px"))
+    ),
+
+  columns = list(
+# 
+#      appt_year = colDef(
+#       name = "Year",
+#       maxWidth = 100),
+     
+     appt_week = colDef(
+      name = "Week",
+      minWidth = 200),
+     
+     SITE = colDef(
+      name = "Site",
+      minWidth = 200),
+     
+     STANDARD_ADDRESS = colDef(
+      name = "Location",
+      minWidth = 400),
+     
+     DEPT_SPECIALTY_NAME = colDef(
+      name = "Specialty",
+      minWidth = 200),
+     
+     DEPARTMENT_NAME = colDef(
+      name = "Department",
+      minWidth = 200),
+     
+     PROV_TYPE = colDef(
+      name = "Provider Type",
+      minWidth = 200),
+     
+     PROV_NAME_WID = colDef(
+      name = "Provider",
+      minWidth = 200),
+     
+     Arrived_AVG = colDef(
+      name = "Mon-Thu Avg",
+      maxWidth = 80,
+      headerStyle = list(background = "#7f7f7f", color = "white", fontWeight = "Bold", fontSize = "14px"),
+      aggregate = 'sum',
+      format = colFormat(separators = TRUE, digits = 0)),
+     
+     Arrived_FRIDAY = colDef(
+      name = "Fri",
+      maxWidth = 80,
+      headerStyle = list(background = "#7f7f7f", color = "white", fontWeight = "Bold", fontSize = "14px"),
+      aggregate = 'sum',
+      format = colFormat(separators = TRUE, digits = 0)),
+     
+     Arrived_VAR = colDef(
+      name = "Var",
+      maxWidth = 80,
+      headerStyle = list(background = "#7f7f7f", color = "white", fontWeight = "Bold", fontSize = "14px"),
+      aggregate = JS("function(values, rows) {
+        let totalArrived_AVG = 0
+        let totalArrived_FRIDAY = 0
+        rows.forEach(function(row) {
+          totalArrived_AVG += row['Arrived_AVG']
+          totalArrived_FRIDAY += row['Arrived_FRIDAY']
+        })
+        return (totalArrived_FRIDAY - totalArrived_AVG) || '-'
+      }"),
+      style = JS("function(rowInfo) {
+        var value = rowInfo.row['Arrived_VAR']
+        if (value > 0) {
+          var color = '#008000'
+        } else {
+          var color = ' #e00000'
+        }
+        return { color: color, fontFamily: 'calibri', fontWeight: 'bold'}
+      }"),
+      format = colFormat(separators = TRUE, digits = 0)),
+     
+     Arrived_VAR_PERC = colDef(
+      name = "% Var",
+      maxWidth = 80,
+      headerStyle = list(background = "#7f7f7f", color = "white", fontWeight = "Bold", fontSize = "14px"),
+      aggregate = JS("function(values, rows) {
+        let totalArrived_AVG = 0
+        let totalArrived_FRIDAY = 0
+        rows.forEach(function(row) {
+          totalArrived_AVG += row['Arrived_AVG']
+          totalArrived_FRIDAY += row['Arrived_FRIDAY']
+        })
+        return (totalArrived_FRIDAY - totalArrived_AVG) / totalArrived_AVG || '-'
+      }"),
+      style = JS("function(rowInfo) {
+        var value = rowInfo.row['Arrived_VAR_PERC']
+        if (value > 0) {
+          var color = '#008000'
+        } else {
+          var color = ' #e00000'
+        }
+        return { color: color, fontFamily: 'calibri', fontWeight: 'bold'}
+      }"),
+      format = colFormat(percent = TRUE, digits = 1)),
+     
+     
+     
+     md_cnt_AVG = colDef(
+      name = "Mon-Thu Avg",
+      maxWidth = 80,
+      headerStyle = list(background = "#212070", color = "white", fontWeight = "Bold", fontSize = "14px"),
+      aggregate = 'sum',
+      format = colFormat(separators = TRUE, digits = 0)),
+     
+     md_cnt_FRIDAY = colDef(
+      name = "Fri",
+      maxWidth = 80,
+      headerStyle = list(background = "#212070", color = "white", fontWeight = "Bold", fontSize = "14px"),
+      aggregate = 'sum',
+      format = colFormat(separators = TRUE, digits = 0)),
+     
+     md_cnt_VAR = colDef(
+      name = "Var",
+      maxWidth = 80,
+      headerStyle = list(background = "#212070", color = "white", fontWeight = "Bold", fontSize = "14px"),
+      aggregate = JS("function(values, rows) {
+        let totalmd_cnt_AVG = 0
+        let totalmd_cnt_FRIDAY = 0
+        rows.forEach(function(row) {
+          totalmd_cnt_AVG += row['md_cnt_AVG']
+          totalmd_cnt_FRIDAY += row['md_cnt_FRIDAY']
+        })
+        return (totalmd_cnt_FRIDAY - totalmd_cnt_AVG) || '-'
+      }"),
+      style = JS("function(rowInfo) {
+        var value = rowInfo.row['md_cnt_VAR']
+        if (value > 0) {
+          var color = '#008000'
+        } else {
+          var color = ' #e00000'
+        }
+        return { color: color, fontFamily: 'calibri', fontWeight: 'bold'}
+      }"),
+      format = colFormat(separators = TRUE, digits = 0)),
+     
+     md_cnt_VAR_PERC = colDef(
+      name = "% Var",
+      maxWidth = 80,
+      headerStyle = list(background = "#212070", color = "white", fontWeight = "Bold", fontSize = "14px"),
+      aggregate = JS("function(values, rows) {
+        let totalmd_cnt_AVG = 0
+        let totalmd_cnt_FRIDAY = 0
+        rows.forEach(function(row) {
+          totalmd_cnt_AVG += row['md_cnt_AVG']
+          totalmd_cnt_FRIDAY += row['md_cnt_FRIDAY']
+        })
+        return (totalmd_cnt_FRIDAY - totalmd_cnt_AVG) / totalmd_cnt_AVG || '-'
+      }"),
+      style = JS("function(rowInfo) {
+        var value = rowInfo.row['md_cnt_VAR_PERC']
+        if (value > 0) {
+          var color = '#008000'
+        } else {
+          var color = ' #e00000'
+        }
+        return { color: color, fontFamily: 'calibri', fontWeight: 'bold'}
+      }"),
+      format = colFormat(percent = TRUE, digits = 1)),
+     
+     
+     
+     session_cnt_AVG = colDef(
+      name = "Mon-Thu Avg",
+      maxWidth = 80,
+      headerStyle = list(background = "#d80b8c", color = "white", fontWeight = "Bold", fontSize = "14px"),
+      aggregate = 'sum',
+      format = colFormat(separators = TRUE, digits = 0)),
+     
+     session_cnt_FRIDAY = colDef(
+      name = "Fri",
+      maxWidth = 80,
+      headerStyle = list(background = "#d80b8c", color = "white", fontWeight = "Bold", fontSize = "14px"),
+      aggregate = 'sum',
+      format = colFormat(separators = TRUE, digits = 0)),
+     
+     session_cnt_VAR = colDef(
+      name = "Var",
+      maxWidth = 80,
+      headerStyle = list(background = "#d80b8c", color = "white", fontWeight = "Bold", fontSize = "14px"),
+      aggregate = JS("function(values, rows) {
+        let totalsession_cnt_AVG = 0
+        let totalsession_cnt_FRIDAY = 0
+        rows.forEach(function(row) {
+          totalsession_cnt_AVG += row['session_cnt_AVG']
+          totalsession_cnt_FRIDAY += row['session_cnt_FRIDAY']
+        })
+        return (totalsession_cnt_FRIDAY - totalsession_cnt_AVG) || '-'
+      }"),
+      style = JS("function(rowInfo) {
+        var value = rowInfo.row['session_cnt_VAR']
+        if (value > 0) {
+          var color = '#008000'
+        } else {
+          var color = ' #e00000'
+        }
+        return { color: color, fontFamily: 'calibri', fontWeight: 'bold'}
+      }"),
+      format = colFormat(separators = TRUE, digits = 0)),
+     
+     session_cnt_VAR_PERC = colDef(
+      name = "% Var",
+      maxWidth = 80,
+      headerStyle = list(background = "#d80b8c", color = "white", fontWeight = "Bold", fontSize = "14px"),
+      aggregate = JS("function(values, rows) {
+        let totalsession_cnt_AVG = 0
+        let totalsession_cnt_FRIDAY = 0
+        rows.forEach(function(row) {
+          totalsession_cnt_AVG += row['session_cnt_AVG']
+          totalsession_cnt_FRIDAY += row['session_cnt_FRIDAY']
+        })
+        return (totalsession_cnt_FRIDAY - totalsession_cnt_AVG) / totalsession_cnt_AVG || '-'
+      }"),
+      style = JS("function(rowInfo) {
+        var value = rowInfo.row['session_cnt_VAR_PERC']
+        if (value > 0) {
+          var color = '#008000'
+        } else {
+          var color = ' #e00000'
+        }
+        return { color: color, fontFamily: 'calibri', fontWeight: 'bold'}
+      }"),
+      format = colFormat(percent = TRUE, digits = 1)),
+     
+     
+     unfilled_cnt_AVG = colDef(
+      name = "Mon-Thu Avg",
+      maxWidth = 80,
+      headerStyle = list(background = "#00aeef", color = "white", fontWeight = "Bold", fontSize = "14px"),
+      aggregate = 'sum',
+      format = colFormat(separators = TRUE, digits = 0)),
+     
+     unfilled_cnt_FRIDAY = colDef(
+      name = "Fri",
+      maxWidth = 80,
+      headerStyle = list(background = "#00aeef", color = "white", fontWeight = "Bold", fontSize = "14px"),
+      aggregate = 'sum',
+      format = colFormat(separators = TRUE, digits = 0)),
+     
+     unfilled_cnt_VAR = colDef(
+      name = "Var",
+      maxWidth = 80,
+      headerStyle = list(background = "#00aeef", color = "white", fontWeight = "Bold", fontSize = "14px"),
+      aggregate = JS("function(values, rows) {
+        let totalunfilled_cnt_AVG = 0
+        let totalunfilled_cnt_FRIDAY = 0
+        rows.forEach(function(row) {
+          totalunfilled_cnt_AVG += row['unfilled_cnt_AVG']
+          totalunfilled_cnt_FRIDAY += row['unfilled_cnt_FRIDAY']
+        })
+        return (totalunfilled_cnt_FRIDAY - totalunfilled_cnt_AVG) || '-'
+      }"),
+      style = JS("function(rowInfo) {
+        var value = rowInfo.row['unfilled_cnt_VAR']
+        if (value > 0) {
+          var color = '#e00000'
+        } else {
+          var color = '#008000'
+        }
+        return { color: color, fontFamily: 'calibri', fontWeight: 'bold'}
+      }"),
+      format = colFormat(separators = TRUE, digits = 0)),
+     
+     unfilled_cnt_VAR_PERC = colDef(
+      name = "% Var",
+      maxWidth = 80,
+      headerStyle = list(background = "#00aeef", color = "white", fontWeight = "Bold", fontSize = "14px"),
+      aggregate = JS("function(values, rows) {
+        let totalunfilled_cnt_AVG = 0
+        let totalunfilled_cnt_FRIDAY = 0
+        rows.forEach(function(row) {
+          totalunfilled_cnt_AVG += row['unfilled_cnt_AVG']
+          totalunfilled_cnt_FRIDAY += row['unfilled_cnt_FRIDAY']
+        })
+        return (totalunfilled_cnt_FRIDAY - totalunfilled_cnt_AVG) / totalunfilled_cnt_AVG || '-'
+      }"),
+      style = JS("function(rowInfo) {
+        var value = rowInfo.row['unfilled_cnt_VAR_PERC']
+        if (value > 0) {
+          var color = '#e00000'
+        } else {
+          var color = '#008000'
+        }
+        return { color: color, fontFamily: 'calibri', fontWeight: 'bold'}
+      }"),
+      format = colFormat(percent = TRUE, digits = 1)),
+     
+     
+     
+     No_Show_Rate_AVG = colDef(
+      name = "Mon-Thu Avg",
+      maxWidth = 80,
+      headerStyle = list(background = "#a5a7a5", color = "white", fontWeight = "Bold", fontSize = "14px"),
+      aggregate = JS("function(values, rows) {
+        let totalNo_Show_AVG = 0
+        let totalCanceled_AVG = 0
+        let totalRescheduled_AVG = 0
+        let totalArrived_AVG = 0
+        rows.forEach(function(row) {
+          totalNo_Show_AVG += row['No_Show_AVG']
+          totalCanceled_AVG += row['Canceled_AVG']
+          totalRescheduled_AVG += row['Rescheduled_AVG']
+          totalArrived_AVG += row['Arrived_AVG']
+        })
+        return (totalNo_Show_AVG + totalCanceled_AVG + totalRescheduled_AVG) / (totalNo_Show_AVG + totalCanceled_AVG + totalRescheduled_AVG + totalArrived_AVG) || '-'
+      }"),
+      style = JS("function(rowInfo) {
+        var value = rowInfo.row['No_Show_Rate_AVG']
+        if (value > 0) {
+          var color = '#e00000'
+        } else {
+          var color = '#008000'
+        }
+        return { color: color, fontFamily: 'calibri', fontWeight: 'bold'}
+      }"),
+      format = colFormat(percent = TRUE, digits = 1)),
+     
+     
+     No_Show_Rate_FRIDAY = colDef(
+      name = "Fri",
+      maxWidth = 80,
+      headerStyle = list(background = "#a5a7a5", color = "white", fontWeight = "Bold", fontSize = "14px"),
+      aggregate = JS("function(values, rows) {
+        let totalNo_Show_FRIDAY = 0
+        let totalCanceled_FRIDAY = 0
+        let totalRescheduled_FRIDAY = 0
+        let totalArrived_FRIDAY = 0
+        rows.forEach(function(row) {
+          totalNo_Show_FRIDAY += row['No_Show_FRIDAY']
+          totalCanceled_FRIDAY += row['Canceled_FRIDAY']
+          totalRescheduled_FRIDAY += row['Rescheduled_FRIDAY']
+          totalArrived_FRIDAY += row['Arrived_FRIDAY']
+        })
+        return (totalNo_Show_FRIDAY + totalCanceled_FRIDAY + totalRescheduled_FRIDAY) / 
+        (totalNo_Show_FRIDAY + totalCanceled_FRIDAY + totalRescheduled_FRIDAY + totalArrived_FRIDAY) || '-'
+      }"),
+      style = JS("function(rowInfo) {
+        var value = rowInfo.row['No_Show_Rate_FRIDAY']
+        if (value > 0) {
+          var color = '#e00000'
+        } else {
+          var color = ' #008000'
+        }
+        return { color: color, fontFamily: 'calibri', fontWeight: 'bold'}
+      }"),
+      format = colFormat(percent = TRUE, digits = 1)),
+     
+     appt_year = colDef(show =F),
+     holiday = colDef(show =F),
+     DEPARTMENT_ID = colDef(show =F),
+     PROV_ID = colDef(show =F),
+     NPI = colDef(show =F),
+     Arrived_MONDAY = colDef(show =F),
+     Arrived_TUESDAY = colDef(show =F),
+     Arrived_WEDNESDAY = colDef(show =F),
+     Arrived_THURSDAY = colDef(show =F),
+     Arrived_SATURDAY = colDef(show =F),
+     Arrived_SUNDAY = colDef(show =F),
+     md_cnt_MONDAY = colDef(show =F),
+     md_cnt_TUESDAY = colDef(show =F),
+     md_cnt_WEDNESDAY = colDef(show =F),
+     md_cnt_THURSDAY = colDef(show =F),
+     md_cnt_SATURDAY = colDef(show =F),
+     md_cnt_SUNDAY = colDef(show =F),
+     session_cnt_MONDAY = colDef(show =F),
+     session_cnt_TUESDAY = colDef(show =F),
+     session_cnt_WEDNESDAY = colDef(show =F),
+     session_cnt_THURSDAY = colDef(show =F),
+     session_cnt_SATURDAY = colDef(show =F),
+     session_cnt_SUNDAY = colDef(show =F),
+     unfilled_cnt_MONDAY = colDef(show =F),
+     unfilled_cnt_TUESDAY = colDef(show =F),
+     unfilled_cnt_WEDNESDAY = colDef(show =F),
+     unfilled_cnt_THURSDAY = colDef(show =F),
+     unfilled_cnt_SATURDAY = colDef(show =F),
+     unfilled_cnt_SUNDAY = colDef(show =F),
+     Canceled_MONDAY = colDef(show =F),
+     Canceled_TUESDAY = colDef(show =F),
+     Canceled_WEDNESDAY = colDef(show =F),
+     Canceled_THURSDAY = colDef(show =F),
+     Canceled_FRIDAY = colDef(show =F),
+     Canceled_SATURDAY = colDef(show =F),
+     Canceled_SUNDAY = colDef(show =F),
+     Canceled_AVG = colDef(show =F),
+     Rescheduled_MONDAY = colDef(show =F),
+     Rescheduled_TUESDAY = colDef(show =F),
+     Rescheduled_WEDNESDAY = colDef(show =F),
+     Rescheduled_THURSDAY = colDef(show =F),
+     Rescheduled_FRIDAY = colDef(show =F),
+     Rescheduled_SATURDAY = colDef(show =F),
+     Rescheduled_SUNDAY = colDef(show =F),
+     Rescheduled_AVG = colDef(show =F),
+     No_Show_MONDAY = colDef(show =F),
+     No_Show_TUESDAY = colDef(show =F),
+     No_Show_WEDNESDAY = colDef(show =F),
+     No_Show_THURSDAY = colDef(show =F),
+     No_Show_FRIDAY = colDef(show =F),
+     No_Show_SATURDAY = colDef(show =F),
+     No_Show_SUNDAY = colDef(show =F),
+     No_Show_AVG = colDef(show =F)
+     
+  ) # Close Columns
+
+  ) # Close Reactable
+) # Close Taglist
+) # Close htmltools
+
+
+```
+
+
+## Performance by Month (Physicians Only)
+*Performance by Week includes all weeks*<br/>
+```{r KPI Tracker by Month}
+
+htmltools::browsable(
+  tagList(
+    tags$button(
+      tagList(fontawesome::fa("download"), "Download Table"),
+      onclick = "Reactable.downloadDataCSV('performance-tracker-month', 'Volume Rebuild Progress')"
+    ),
+
+# htmltools::browsable(
+#   tagList(
+#     div(tags$label("Summary by", `for` = "access-roi")),
+#     tags$select(
+#       id = "access-roi",
+#       onchange = "Reactable.setGroupBy('access-metrics', this.value ? [this.value] : [])",
+#       tags$option("None", value = ""),
+#       lapply(c("Year", "Month"), tags$option)
+#     ),
+# 
+#     tags$hr("aria-hidden" = "true"),
+    
+reactable(
+  merged_data_month %>%
+    filter(SITE %in% c("MSB", "MSBI", "MSDMG", "MSH- AMBULATORY CARE", "MSH-MSDFP", "MSM", "MSQ",
+                       "MSUS", "MSW", "NETWORK", "NYEE", "MSB")) %>%
+    filter(PROV_TYPE == "Physician"),
+  elementId = "performance-tracker-month",
+  # elementId = "referral-vol-download-table",
+  style = list(fontFamily = 'Calibri',
+                 fontSize = '14px'),
+    defaultColDef = colDef(align = "left",
+                           headerStyle = list(fontWeight = "Bold", fontSize = "14px"),
+                           headerClass = "bar-sort-header"),
+  # RowStyle = function(index) {
+  #           if (index %in% c(nrow(referral_vol_site_data_mshs))) {
+  #             list(`border-top` = "2px solid rgb(184,184,184)",
+  #                  fontWeight = "Bold")
+  #           }
+  #         },
+    highlight = TRUE,
+    # filterable = TRUE,
+    pagination = FALSE,
+    # height = 800,
+    wrap = TRUE,
+  searchable = TRUE,
+
+  groupBy = c("appt_year", "appt_month","SITE","STANDARD_ADDRESS","DEPT_SPECIALTY_NAME","DEPARTMENT_NAME","PROV_TYPE"),
+
+  columnGroups = list(
+    colGroup(name = "", columns = c("appt_year", "appt_month"),
              headerStyle = list(color = "black", fontSize = "15px"),
              sticky = "left"),
     colGroup(name = "", columns = c("SITE","STANDARD_ADDRESS","DEPT_SPECIALTY_NAME","DEPARTMENT_NAME","PROV_TYPE", "PROV_NAME_WID"),
@@ -990,9 +1478,9 @@ reactable(
       name = "Year",
       maxWidth = 100),
      
-     appt_week = colDef(
+     appt_month = colDef(
       name = "Week",
-      minWidth = 200),
+      maxWidth = 200),
      
      SITE = colDef(
       name = "Site",
