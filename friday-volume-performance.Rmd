@@ -686,7 +686,7 @@ merged_data <- merged_data %>%
 
 ```{r Friday Volume Opportunity Analysis by Month}
 
-date_start <- as.Date("2025-12-29")
+date_start <- as.Date("2026-1-1")
 date_end <- as.Date(Sys.Date() - 1)
 date_end <- date_end - as.integer(format(date_end, "%u"))
 
@@ -722,7 +722,6 @@ volume_no_show_month <- access_raw_tbl %>%
   mutate(lead_14days = ifelse(lead_days <= 14, "lead_14days", "lead_14days_more")) %>%
   filter(CONTACT_DATE >= TO_DATE(date_start , "YYYY-MM-DD HH24:MI:SS")) %>%
   filter(CONTACT_DATE <= TO_DATE(date_end , "YYYY-MM-DD HH24:MI:SS")) %>%
-  filter(year(CONTACT_DATE) == 2026) %>%
   # dplyr::select(SITE, DEPT_SPECIALTY_NAME, DEPARTMENT_NAME, DEPARTMENT_ID, PROV_NAME_WID, PAT_ENC_CSN_ID, APPT_STATUS_NAME, CANCEL_LEAD_HOURS, CANCEL_INITIATOR) %>%
   group_by(SITE, DEPT_SPECIALTY_NAME, DEPARTMENT_NAME, DEPARTMENT_ID, PROV_ID, NPI, PROV_NAME_WID, PROV_TYPE,
            appt_year, appt_month, appt_day,
@@ -751,7 +750,6 @@ volume_no_show_month <- volume_no_show_month %>%
 sessions_month <- access_raw_tbl %>%
   filter(CONTACT_DATE >= TO_DATE(date_start , "YYYY-MM-DD HH24:MI:SS")) %>%
   filter(CONTACT_DATE <= TO_DATE(date_end , "YYYY-MM-DD HH24:MI:SS")) %>%
-  filter(year(CONTACT_DATE) == 2026) %>%
   mutate(cancel_lead_days = APPT_DTTM - APPT_CANC_DTTM) %>%
   filter(DERIVED_STATUS_DESC == "Arrived" |
            DERIVED_STATUS_DESC == "No Show" |
@@ -786,7 +784,6 @@ sessions_month <- access_raw_tbl %>%
 physicians_month <- access_raw_tbl %>%
   filter(CONTACT_DATE >= TO_DATE(date_start , "YYYY-MM-DD HH24:MI:SS")) %>%
   filter(CONTACT_DATE <= TO_DATE(date_end , "YYYY-MM-DD HH24:MI:SS")) %>%
-  filter(year(CONTACT_DATE) == 2026) %>%
   mutate(cancel_lead_days = APPT_DTTM - APPT_CANC_DTTM) %>%
   filter(DERIVED_STATUS_DESC == "Arrived" |
            DERIVED_STATUS_DESC == "No Show" |
@@ -825,7 +822,6 @@ unfilled_slots_month <- tbl(conn2, "V_AVAILABILITY") %>%
   # left_join(clarity_ser_2_tbl %>% dplyr::select(PROV_ID, NPI)) %>%
   filter(SLOT_BEGIN_TIME >= TO_DATE(date_start , "YYYY-MM-DD HH24:MI:SS")) %>%
   filter(SLOT_BEGIN_TIME <= TO_DATE(date_end , "YYYY-MM-DD HH24:MI:SS")) %>%
-  filter(year(SLOT_BEGIN_TIME) == 2026) %>%
   mutate(slot_date = sql("TRUNC(SLOT_BEGIN_TIME)"),
          slot_year = year(SLOT_BEGIN_TIME),
          slot_month = month(SLOT_BEGIN_TIME),
