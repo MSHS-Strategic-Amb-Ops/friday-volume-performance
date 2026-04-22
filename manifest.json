@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "locale": "en_US",
+  "platform": "4.2.3",
+  "metadata": {
+    "appmode": "static",
+    "primary_rmd": null,
+    "primary_html": "friday-volume-performance",
+    "content_category": null,
+    "has_parameters": false
+  },
+  "packages": null,
+  "files": {
+    "Mount_Sinai_Logo_H.png": {
+      "checksum": "2947092f1b4ba7d991e336025e6b44d7"
+    }
+  },
+  "users": null
+}
