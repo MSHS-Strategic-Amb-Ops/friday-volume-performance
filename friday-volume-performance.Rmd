@@ -463,7 +463,7 @@ holidays <- holidays %>%
 ```
 
 
-```{r Friday Volume Opportunity Analysis}
+```{r Friday Volume Opportunity Analysis by Week}
 
 date_start <- as.Date("2025-12-29")
 date_end <- as.Date(Sys.Date() - 1)
@@ -503,7 +503,7 @@ volume_no_show <- access_raw_tbl %>%
   filter(CONTACT_DATE <= TO_DATE(date_end , "YYYY-MM-DD HH24:MI:SS")) %>%
   # dplyr::select(SITE, DEPT_SPECIALTY_NAME, DEPARTMENT_NAME, DEPARTMENT_ID, PROV_NAME_WID, PAT_ENC_CSN_ID, APPT_STATUS_NAME, CANCEL_LEAD_HOURS, CANCEL_INITIATOR) %>%
   group_by(SITE, DEPT_SPECIALTY_NAME, DEPARTMENT_NAME, DEPARTMENT_ID, PROV_ID, NPI, PROV_NAME_WID, PROV_TYPE, 
-           appt_year, appt_week, appt_day,
+           appt_week, appt_day,
            # appt_day, CONTACT_DATE,
            DERIVED_STATUS_DESC) %>%
   summarise(total = n()) %>%
@@ -538,7 +538,7 @@ sessions <- access_raw_tbl %>%
          appt_month = month(CONTACT_DATE),
          appt_week = sql("TRUNC(CONTACT_DATE, 'IW')"),
          appt_day = sql("TRIM(TO_CHAR(CONTACT_DATE, 'DAY'))")) %>%
-  group_by(DEPARTMENT_ID, PROV_ID, appt_year, appt_week, appt_day, CONTACT_DATE) %>%
+  group_by(DEPARTMENT_ID, PROV_ID, appt_week, appt_day, CONTACT_DATE) %>%
   summarise(
     first_appt = min(APPT_DTTM),
     last_appt  = max(APPT_DTTM),
@@ -546,7 +546,7 @@ sessions <- access_raw_tbl %>%
     .groups = "drop"
   ) %>%
   mutate(total = ifelse(first_last_appt_hour<2,0, ifelse(first_last_appt_hour<5,1, ifelse(first_last_appt_hour<9,2,3)))) %>%
-  group_by(DEPARTMENT_ID, PROV_ID, appt_year, appt_week, appt_day) %>%
+  group_by(DEPARTMENT_ID, PROV_ID, appt_week, appt_day) %>%
   summarise(total = sum(total, na.rm = T)) %>%
   collect() %>%
   mutate(session_cnt = "session_cnt") %>%
@@ -572,7 +572,7 @@ physicians <- access_raw_tbl %>%
          appt_month = month(CONTACT_DATE),
          appt_week = sql("TRUNC(CONTACT_DATE, 'IW')"),
          appt_day = sql("TRIM(TO_CHAR(CONTACT_DATE, 'DAY'))")) %>%
-  group_by(DEPARTMENT_ID, PROV_ID, appt_year, appt_week, appt_day) %>%
+  group_by(DEPARTMENT_ID, PROV_ID, appt_week, appt_day) %>%
   summarise(total = n_distinct(PROV_ID)) %>%
   collect() %>%
   mutate(md_cnt = "md_cnt") %>%
@@ -617,7 +617,7 @@ unfilled_slots <- tbl(conn2, "V_AVAILABILITY") %>%
   filter(APPT_NUMBER == 0) %>%
   filter(ORG_REG_OPENINGS - NUM_APTS_SCHEDULED > 0) %>%
 
-  group_by(DEPARTMENT_ID, PROV_ID, slot_year, slot_week, slot_day) %>%
+  group_by(DEPARTMENT_ID, PROV_ID, slot_week, slot_day) %>%
   summarise(total = n()) %>%
   collect() %>%
   mutate(unfilled_cnt = "unfilled_cnt") %>%
@@ -637,7 +637,6 @@ merged_data <- full_join(merged_data, physicians)
 merged_data <- left_join(merged_data, unfilled_slots,
                          by = c("DEPARTMENT_ID" = "DEPARTMENT_ID",
                                 "PROV_ID" = "PROV_ID",
-                                "appt_year" = "slot_year",
                                 "appt_week" = "slot_week"))
 
 
@@ -648,13 +647,13 @@ merged_data <- merged_data %>%
   left_join(holidays %>% dplyr::select(holiday, week_start), 
             by = c("appt_week" = "week_start")) %>%
   mutate(appt_week = as.character(appt_week)) %>%
-  arrange(appt_year, appt_week, STANDARD_ADDRESS, DEPT_SPECIALTY_NAME, DEPARTMENT_NAME, PROV_TYPE, PROV_NAME_WID)
+  arrange(appt_week, STANDARD_ADDRESS, DEPT_SPECIALTY_NAME, DEPARTMENT_NAME, PROV_TYPE, PROV_NAME_WID)
 
 # require(openxlsx)
 # write.xlsx(friday_data, "Friday Volume_040926.xlsx")
 
 
-col_order <- c("appt_year", "appt_week", "holiday",
+col_order <- c("appt_week", "holiday",
                "SITE", "STANDARD_ADDRESS",  "DEPT_SPECIALTY_NAME", "DEPARTMENT_NAME", "DEPARTMENT_ID", "PROV_TYPE", "PROV_ID", "NPI", "PROV_NAME_WID",
                "Arrived_AVG", "Arrived_MONDAY", "Arrived_TUESDAY", "Arrived_WEDNESDAY", "Arrived_THURSDAY", "Arrived_FRIDAY", "Arrived_SATURDAY", "Arrived_SUNDAY",
                "Arrived_VAR", "Arrived_VAR_PERC",
@@ -1037,13 +1036,19 @@ reactable(
       maxWidth = 80,
       headerStyle = list(background = "#7f7f7f", color = "white", fontWeight = "Bold", fontSize = "14px"),
       aggregate = JS("function(values, rows) {
-        let totalArrived_AVG = 0
+        let totalArrived_MONDAY = 0
+        let totalArrived_TUESDAY = 0
+        let totalArrived_WEDNESDAY = 0
+        let totalArrived_THURSDAY = 0
         let totalArrived_FRIDAY = 0
         rows.forEach(function(row) {
-          totalArrived_AVG += row['Arrived_AVG']
+          totalArrived_MONDAY += row['Arrived_MONDAY']
+          totalArrived_TUESDAY += row['Arrived_TUESDAY']
+          totalArrived_WEDNESDAY += row['Arrived_WEDNESDAY']
+          totalArrived_THURSDAY += row['Arrived_THURSDAY']
           totalArrived_FRIDAY += row['Arrived_FRIDAY']
         })
-        return (totalArrived_FRIDAY - totalArrived_AVG) || '-'
+        return (totalArrived_FRIDAY) - ((totalArrived_MONDAY + totalArrived_TUESDAY + totalArrived_WEDNESDAY + totalArrived_THURSDAY)/4) || '-'
       }"),
       style = JS("function(rowInfo) {
         var value = rowInfo.row['Arrived_VAR']
@@ -1061,13 +1066,20 @@ reactable(
       maxWidth = 80,
       headerStyle = list(background = "#7f7f7f", color = "white", fontWeight = "Bold", fontSize = "14px"),
       aggregate = JS("function(values, rows) {
-        let totalArrived_AVG = 0
+        let totalArrived_MONDAY = 0
+        let totalArrived_TUESDAY = 0
+        let totalArrived_WEDNESDAY = 0
+        let totalArrived_THURSDAY = 0
         let totalArrived_FRIDAY = 0
         rows.forEach(function(row) {
-          totalArrived_AVG += row['Arrived_AVG']
+          totalArrived_MONDAY += row['Arrived_MONDAY']
+          totalArrived_TUESDAY += row['Arrived_TUESDAY']
+          totalArrived_WEDNESDAY += row['Arrived_WEDNESDAY']
+          totalArrived_THURSDAY += row['Arrived_THURSDAY']
           totalArrived_FRIDAY += row['Arrived_FRIDAY']
         })
-        return (totalArrived_FRIDAY - totalArrived_AVG) / totalArrived_AVG || '-'
+        return (totalArrived_FRIDAY - ((totalArrived_MONDAY + totalArrived_TUESDAY + totalArrived_WEDNESDAY + totalArrived_THURSDAY)/4)) /
+        ((totalArrived_MONDAY + totalArrived_TUESDAY + totalArrived_WEDNESDAY + totalArrived_THURSDAY)/4) || '-'
       }"),
       style = JS("function(rowInfo) {
         var value = rowInfo.row['Arrived_VAR_PERC']
@@ -1079,35 +1091,41 @@ reactable(
         return { color: color, fontFamily: 'calibri', fontWeight: 'bold'}
       }"),
       format = colFormat(percent = TRUE, digits = 1)),
-     
-     
-     
+
+
+
      md_cnt_AVG = colDef(
       name = "Mon-Thu Avg",
       maxWidth = 80,
       headerStyle = list(background = "#212070", color = "white", fontWeight = "Bold", fontSize = "14px"),
       aggregate = 'sum',
       format = colFormat(separators = TRUE, digits = 0)),
-     
+
      md_cnt_FRIDAY = colDef(
       name = "Fri",
       maxWidth = 80,
       headerStyle = list(background = "#212070", color = "white", fontWeight = "Bold", fontSize = "14px"),
       aggregate = 'sum',
       format = colFormat(separators = TRUE, digits = 0)),
-     
+
      md_cnt_VAR = colDef(
       name = "Var",
       maxWidth = 80,
       headerStyle = list(background = "#212070", color = "white", fontWeight = "Bold", fontSize = "14px"),
       aggregate = JS("function(values, rows) {
-        let totalmd_cnt_AVG = 0
+        let totalmd_cnt_MONDAY = 0
+        let totalmd_cnt_TUESDAY = 0
+        let totalmd_cnt_WEDNESDAY = 0
+        let totalmd_cnt_THURSDAY = 0
         let totalmd_cnt_FRIDAY = 0
         rows.forEach(function(row) {
-          totalmd_cnt_AVG += row['md_cnt_AVG']
+          totalmd_cnt_MONDAY += row['md_cnt_MONDAY']
+          totalmd_cnt_TUESDAY += row['md_cnt_TUESDAY']
+          totalmd_cnt_WEDNESDAY += row['md_cnt_WEDNESDAY']
+          totalmd_cnt_THURSDAY += row['md_cnt_THURSDAY']
           totalmd_cnt_FRIDAY += row['md_cnt_FRIDAY']
         })
-        return (totalmd_cnt_FRIDAY - totalmd_cnt_AVG) || '-'
+        return (totalmd_cnt_FRIDAY - ((totalmd_cnt_MONDAY + totalmd_cnt_TUESDAY + totalmd_cnt_WEDNESDAY + totalmd_cnt_THURSDAY)/4)) || '-'
       }"),
       style = JS("function(rowInfo) {
         var value = rowInfo.row['md_cnt_VAR']
@@ -1119,19 +1137,26 @@ reactable(
         return { color: color, fontFamily: 'calibri', fontWeight: 'bold'}
       }"),
       format = colFormat(separators = TRUE, digits = 0)),
-     
+
      md_cnt_VAR_PERC = colDef(
       name = "% Var",
       maxWidth = 80,
       headerStyle = list(background = "#212070", color = "white", fontWeight = "Bold", fontSize = "14px"),
       aggregate = JS("function(values, rows) {
-        let totalmd_cnt_AVG = 0
+       let totalmd_cnt_MONDAY = 0
+        let totalmd_cnt_TUESDAY = 0
+        let totalmd_cnt_WEDNESDAY = 0
+        let totalmd_cnt_THURSDAY = 0
         let totalmd_cnt_FRIDAY = 0
         rows.forEach(function(row) {
-          totalmd_cnt_AVG += row['md_cnt_AVG']
+          totalmd_cnt_MONDAY += row['md_cnt_MONDAY']
+          totalmd_cnt_TUESDAY += row['md_cnt_TUESDAY']
+          totalmd_cnt_WEDNESDAY += row['md_cnt_WEDNESDAY']
+          totalmd_cnt_THURSDAY += row['md_cnt_THURSDAY']
           totalmd_cnt_FRIDAY += row['md_cnt_FRIDAY']
         })
-        return (totalmd_cnt_FRIDAY - totalmd_cnt_AVG) / totalmd_cnt_AVG || '-'
+        return (totalmd_cnt_FRIDAY - ((totalmd_cnt_MONDAY + totalmd_cnt_TUESDAY + totalmd_cnt_WEDNESDAY + totalmd_cnt_THURSDAY)/4)) /
+        ((totalmd_cnt_MONDAY + totalmd_cnt_TUESDAY + totalmd_cnt_WEDNESDAY + totalmd_cnt_THURSDAY)/4) || '-'
       }"),
       style = JS("function(rowInfo) {
         var value = rowInfo.row['md_cnt_VAR_PERC']
@@ -1143,35 +1168,41 @@ reactable(
         return { color: color, fontFamily: 'calibri', fontWeight: 'bold'}
       }"),
       format = colFormat(percent = TRUE, digits = 1)),
-     
-     
-     
+
+
+
      session_cnt_AVG = colDef(
       name = "Mon-Thu Avg",
       maxWidth = 80,
       headerStyle = list(background = "#d80b8c", color = "white", fontWeight = "Bold", fontSize = "14px"),
       aggregate = 'sum',
       format = colFormat(separators = TRUE, digits = 0)),
-     
+
      session_cnt_FRIDAY = colDef(
       name = "Fri",
       maxWidth = 80,
       headerStyle = list(background = "#d80b8c", color = "white", fontWeight = "Bold", fontSize = "14px"),
       aggregate = 'sum',
       format = colFormat(separators = TRUE, digits = 0)),
-     
+
      session_cnt_VAR = colDef(
       name = "Var",
       maxWidth = 80,
       headerStyle = list(background = "#d80b8c", color = "white", fontWeight = "Bold", fontSize = "14px"),
       aggregate = JS("function(values, rows) {
-        let totalsession_cnt_AVG = 0
+        let totalsession_cnt_MONDAY = 0
+        let totalsession_cnt_TUESDAY = 0
+        let totalsession_cnt_WEDNESDAY = 0
+        let totalsession_cnt_THURSDAY = 0
         let totalsession_cnt_FRIDAY = 0
         rows.forEach(function(row) {
-          totalsession_cnt_AVG += row['session_cnt_AVG']
+          totalsession_cnt_MONDAY += row['session_cnt_MONDAY']
+          totalsession_cnt_TUESDAY += row['session_cnt_TUESDAY']
+          totalsession_cnt_WEDNESDAY += row['session_cnt_WEDNESDAY']
+          totalsession_cnt_THURSDAY += row['session_cnt_THURSDAY']
           totalsession_cnt_FRIDAY += row['session_cnt_FRIDAY']
         })
-        return (totalsession_cnt_FRIDAY - totalsession_cnt_AVG) || '-'
+        return (totalsession_cnt_FRIDAY - ((totalsession_cnt_MONDAY + totalsession_cnt_TUESDAY + totalsession_cnt_WEDNESDAY + totalsession_cnt_THURSDAY)/4)) || '-'
       }"),
       style = JS("function(rowInfo) {
         var value = rowInfo.row['session_cnt_VAR']
@@ -1183,19 +1214,26 @@ reactable(
         return { color: color, fontFamily: 'calibri', fontWeight: 'bold'}
       }"),
       format = colFormat(separators = TRUE, digits = 0)),
-     
+
      session_cnt_VAR_PERC = colDef(
       name = "% Var",
       maxWidth = 80,
       headerStyle = list(background = "#d80b8c", color = "white", fontWeight = "Bold", fontSize = "14px"),
       aggregate = JS("function(values, rows) {
-        let totalsession_cnt_AVG = 0
+        let totalsession_cnt_MONDAY = 0
+        let totalsession_cnt_TUESDAY = 0
+        let totalsession_cnt_WEDNESDAY = 0
+        let totalsession_cnt_THURSDAY = 0
         let totalsession_cnt_FRIDAY = 0
         rows.forEach(function(row) {
-          totalsession_cnt_AVG += row['session_cnt_AVG']
+          totalsession_cnt_MONDAY += row['session_cnt_MONDAY']
+          totalsession_cnt_TUESDAY += row['session_cnt_TUESDAY']
+          totalsession_cnt_WEDNESDAY += row['session_cnt_WEDNESDAY']
+          totalsession_cnt_THURSDAY += row['session_cnt_THURSDAY']
           totalsession_cnt_FRIDAY += row['session_cnt_FRIDAY']
         })
-        return (totalsession_cnt_FRIDAY - totalsession_cnt_AVG) / totalsession_cnt_AVG || '-'
+        return (totalsession_cnt_FRIDAY - ((totalsession_cnt_MONDAY + totalsession_cnt_TUESDAY + totalsession_cnt_WEDNESDAY + totalsession_cnt_THURSDAY)/4)) /
+        ((totalsession_cnt_MONDAY + totalsession_cnt_TUESDAY + totalsession_cnt_WEDNESDAY + totalsession_cnt_THURSDAY)/4) || '-'
       }"),
       style = JS("function(rowInfo) {
         var value = rowInfo.row['session_cnt_VAR_PERC']
@@ -1207,34 +1245,40 @@ reactable(
         return { color: color, fontFamily: 'calibri', fontWeight: 'bold'}
       }"),
       format = colFormat(percent = TRUE, digits = 1)),
-     
-     
+
+
      unfilled_cnt_AVG = colDef(
       name = "Mon-Thu Avg",
       maxWidth = 80,
       headerStyle = list(background = "#00aeef", color = "white", fontWeight = "Bold", fontSize = "14px"),
       aggregate = 'sum',
       format = colFormat(separators = TRUE, digits = 0)),
-     
+
      unfilled_cnt_FRIDAY = colDef(
       name = "Fri",
       maxWidth = 80,
       headerStyle = list(background = "#00aeef", color = "white", fontWeight = "Bold", fontSize = "14px"),
       aggregate = 'sum',
       format = colFormat(separators = TRUE, digits = 0)),
-     
+
      unfilled_cnt_VAR = colDef(
       name = "Var",
       maxWidth = 80,
       headerStyle = list(background = "#00aeef", color = "white", fontWeight = "Bold", fontSize = "14px"),
       aggregate = JS("function(values, rows) {
-        let totalunfilled_cnt_AVG = 0
+        let totalunfilled_cnt_MONDAY = 0
+        let totalunfilled_cnt_TUESDAY = 0
+        let totalunfilled_cnt_WEDNESDAY = 0
+        let totalunfilled_cnt_THURSDAY = 0
         let totalunfilled_cnt_FRIDAY = 0
         rows.forEach(function(row) {
-          totalunfilled_cnt_AVG += row['unfilled_cnt_AVG']
+          totalunfilled_cnt_MONDAY += row['unfilled_cnt_MONDAY']
+          totalunfilled_cnt_TUESDAY += row['unfilled_cnt_TUESDAY']
+          totalunfilled_cnt_WEDNESDAY += row['unfilled_cnt_WEDNESDAY']
+          totalunfilled_cnt_THURSDAY += row['unfilled_cnt_THURSDAY']
           totalunfilled_cnt_FRIDAY += row['unfilled_cnt_FRIDAY']
         })
-        return (totalunfilled_cnt_FRIDAY - totalunfilled_cnt_AVG) || '-'
+        return (totalunfilled_cnt_FRIDAY - ((totalunfilled_cnt_MONDAY + totalunfilled_cnt_TUESDAY + totalunfilled_cnt_WEDNESDAY + totalunfilled_cnt_THURSDAY)/4)) || '-'
       }"),
       style = JS("function(rowInfo) {
         var value = rowInfo.row['unfilled_cnt_VAR']
@@ -1246,19 +1290,26 @@ reactable(
         return { color: color, fontFamily: 'calibri', fontWeight: 'bold'}
       }"),
       format = colFormat(separators = TRUE, digits = 0)),
-     
+
      unfilled_cnt_VAR_PERC = colDef(
       name = "% Var",
       maxWidth = 80,
       headerStyle = list(background = "#00aeef", color = "white", fontWeight = "Bold", fontSize = "14px"),
       aggregate = JS("function(values, rows) {
-        let totalunfilled_cnt_AVG = 0
+        let totalunfilled_cnt_MONDAY = 0
+        let totalunfilled_cnt_TUESDAY = 0
+        let totalunfilled_cnt_WEDNESDAY = 0
+        let totalunfilled_cnt_THURSDAY = 0
         let totalunfilled_cnt_FRIDAY = 0
         rows.forEach(function(row) {
-          totalunfilled_cnt_AVG += row['unfilled_cnt_AVG']
+          totalunfilled_cnt_MONDAY += row['unfilled_cnt_MONDAY']
+          totalunfilled_cnt_TUESDAY += row['unfilled_cnt_TUESDAY']
+          totalunfilled_cnt_WEDNESDAY += row['unfilled_cnt_WEDNESDAY']
+          totalunfilled_cnt_THURSDAY += row['unfilled_cnt_THURSDAY']
           totalunfilled_cnt_FRIDAY += row['unfilled_cnt_FRIDAY']
         })
-        return (totalunfilled_cnt_FRIDAY - totalunfilled_cnt_AVG) / totalunfilled_cnt_AVG || '-'
+        return (totalunfilled_cnt_FRIDAY - ((totalunfilled_cnt_MONDAY + totalunfilled_cnt_TUESDAY + totalunfilled_cnt_WEDNESDAY + totalunfilled_cnt_THURSDAY)/4)) /
+        ((totalunfilled_cnt_MONDAY + totalunfilled_cnt_TUESDAY + totalunfilled_cnt_WEDNESDAY + totalunfilled_cnt_THURSDAY)/4) || '-'
       }"),
       style = JS("function(rowInfo) {
         var value = rowInfo.row['unfilled_cnt_VAR_PERC']
@@ -1270,38 +1321,69 @@ reactable(
         return { color: color, fontFamily: 'calibri', fontWeight: 'bold'}
       }"),
       format = colFormat(percent = TRUE, digits = 1)),
-     
-     
-     
-     No_Show_Rate_AVG = colDef(
-      name = "Mon-Thu Avg",
-      maxWidth = 80,
-      headerStyle = list(background = "#a5a7a5", color = "white", fontWeight = "Bold", fontSize = "14px"),
-      aggregate = JS("function(values, rows) {
-        let totalNo_Show_AVG = 0
-        let totalCanceled_AVG = 0
-        let totalRescheduled_AVG = 0
-        let totalArrived_AVG = 0
-        rows.forEach(function(row) {
-          totalNo_Show_AVG += row['No_Show_AVG']
-          totalCanceled_AVG += row['Canceled_AVG']
-          totalRescheduled_AVG += row['Rescheduled_AVG']
-          totalArrived_AVG += row['Arrived_AVG']
-        })
-        return (totalNo_Show_AVG + totalCanceled_AVG + totalRescheduled_AVG) / (totalNo_Show_AVG + totalCanceled_AVG + totalRescheduled_AVG + totalArrived_AVG) || '-'
-      }"),
-      style = JS("function(rowInfo) {
-        var value = rowInfo.row['No_Show_Rate_AVG']
-        if (value > 0) {
-          var color = '#e00000'
-        } else {
-          var color = '#008000'
-        }
-        return { color: color, fontFamily: 'calibri', fontWeight: 'bold'}
-      }"),
-      format = colFormat(percent = TRUE, digits = 1)),
-     
-     
+
+
+
+No_Show_Rate_AVG = colDef(
+ name = "Mon-Thu Avg",
+ maxWidth = 80,
+ headerStyle = list(background = "#a5a7a5", color = "white", fontWeight = "Bold", fontSize = "14px"),
+ aggregate = JS("function(values, rows) {
+   let totalNo_Show_MONDAY = 0
+   let totalNo_Show_TUESDAY = 0
+   let totalNo_Show_WEDNESDAY = 0
+   let totalNo_Show_THURSDAY = 0
+   let totalCanceled_MONDAY = 0
+   let totalCanceled_TUESDAY = 0
+   let totalCanceled_WEDNESDAY = 0
+   let totalCanceled_THURSDAY = 0
+   let totalRescheduled_MONDAY = 0
+   let totalRescheduled_TUESDAY = 0
+   let totalRescheduled_WEDNESDAY = 0
+   let totalRescheduled_THURSDAY = 0
+   let totalArrived_MONDAY = 0
+   let totalArrived_TUESDAY = 0
+   let totalArrived_WEDNESDAY = 0
+   let totalArrived_THURSDAY = 0
+   rows.forEach(function(row) {
+     totalNo_Show_MONDAY += row['No_Show_MONDAY']
+     totalNo_Show_TUESDAY += row['No_Show_TUESDAY']
+     totalNo_Show_WEDNESDAY += row['No_Show_WEDNESDAY']
+     totalNo_Show_THURSDAY += row['No_Show_THURSDAY']
+     totalCanceled_MONDAY += row['Canceled_MONDAY']
+     totalCanceled_TUESDAY += row['Canceled_TUESDAY']
+     totalCanceled_WEDNESDAY += row['Canceled_WEDNESDAY']
+     totalCanceled_THURSDAY += row['Canceled_THURSDAY']
+     totalRescheduled_MONDAY += row['Rescheduled_MONDAY']
+     totalRescheduled_TUESDAY += row['Rescheduled_TUESDAY']
+     totalRescheduled_WEDNESDAY += row['Rescheduled_WEDNESDAY']
+     totalRescheduled_THURSDAY += row['Rescheduled_THURSDAY']
+     totalArrived_MONDAY += row['Arrived_MONDAY']
+     totalArrived_TUESDAY += row['Arrived_TUESDAY']
+     totalArrived_WEDNESDAY += row['Arrived_WEDNESDAY']
+     totalArrived_THURSDAY += row['Arrived_THURSDAY']
+   })
+   return (totalNo_Show_MONDAY + totalNo_Show_TUESDAY + totalNo_Show_WEDNESDAY + totalNo_Show_THURSDAY +
+           totalCanceled_MONDAY + totalCanceled_TUESDAY + totalCanceled_WEDNESDAY + totalCanceled_THURSDAY +
+           totalRescheduled_MONDAY + totalRescheduled_TUESDAY + totalRescheduled_WEDNESDAY + totalRescheduled_THURSDAY) /
+           (totalNo_Show_MONDAY + totalNo_Show_TUESDAY + totalNo_Show_WEDNESDAY + totalNo_Show_THURSDAY +
+           totalCanceled_MONDAY + totalCanceled_TUESDAY + totalCanceled_WEDNESDAY + totalCanceled_THURSDAY +
+           totalRescheduled_MONDAY + totalRescheduled_TUESDAY + totalRescheduled_WEDNESDAY + totalRescheduled_THURSDAY +
+           totalArrived_MONDAY + totalArrived_TUESDAY + totalArrived_WEDNESDAY + totalArrived_THURSDAY) || '-'
+
+ }"),
+ style = JS("function(rowInfo) {
+   var value = rowInfo.row['No_Show_Rate_AVG']
+   if (value > 0) {
+     var color = '#e00000'
+   } else {
+     var color = '#008000'
+   }
+   return { color: color, fontFamily: 'calibri', fontWeight: 'bold'}
+ }"),
+ format = colFormat(percent = TRUE, digits = 1)),
+
+
      No_Show_Rate_FRIDAY = colDef(
       name = "Fri",
       maxWidth = 80,
@@ -1317,7 +1399,7 @@ reactable(
           totalRescheduled_FRIDAY += row['Rescheduled_FRIDAY']
           totalArrived_FRIDAY += row['Arrived_FRIDAY']
         })
-        return (totalNo_Show_FRIDAY + totalCanceled_FRIDAY + totalRescheduled_FRIDAY) / 
+        return (totalNo_Show_FRIDAY + totalCanceled_FRIDAY + totalRescheduled_FRIDAY) /
         (totalNo_Show_FRIDAY + totalCanceled_FRIDAY + totalRescheduled_FRIDAY + totalArrived_FRIDAY) || '-'
       }"),
       style = JS("function(rowInfo) {
@@ -1330,7 +1412,7 @@ reactable(
         return { color: color, fontFamily: 'calibri', fontWeight: 'bold'}
       }"),
       format = colFormat(percent = TRUE, digits = 1)),
-     
+
      appt_year = colDef(show =F),
      holiday = colDef(show =F),
      DEPARTMENT_ID = colDef(show =F),
@@ -1475,7 +1557,7 @@ reactable(
       maxWidth = 100),
      
      appt_month = colDef(
-      name = "Week",
+      name = "Month",
       maxWidth = 200),
      
      SITE = colDef(
@@ -1521,13 +1603,19 @@ reactable(
       maxWidth = 80,
       headerStyle = list(background = "#7f7f7f", color = "white", fontWeight = "Bold", fontSize = "14px"),
       aggregate = JS("function(values, rows) {
-        let totalArrived_AVG = 0
+        let totalArrived_MONDAY = 0
+        let totalArrived_TUESDAY = 0
+        let totalArrived_WEDNESDAY = 0
+        let totalArrived_THURSDAY = 0
         let totalArrived_FRIDAY = 0
         rows.forEach(function(row) {
-          totalArrived_AVG += row['Arrived_AVG']
+          totalArrived_MONDAY += row['Arrived_MONDAY']
+          totalArrived_TUESDAY += row['Arrived_TUESDAY']
+          totalArrived_WEDNESDAY += row['Arrived_WEDNESDAY']
+          totalArrived_THURSDAY += row['Arrived_THURSDAY']
           totalArrived_FRIDAY += row['Arrived_FRIDAY']
         })
-        return (totalArrived_FRIDAY - totalArrived_AVG) || '-'
+        return (totalArrived_FRIDAY) - ((totalArrived_MONDAY + totalArrived_TUESDAY + totalArrived_WEDNESDAY + totalArrived_THURSDAY)/4) || '-'
       }"),
       style = JS("function(rowInfo) {
         var value = rowInfo.row['Arrived_VAR']
@@ -1545,13 +1633,20 @@ reactable(
       maxWidth = 80,
       headerStyle = list(background = "#7f7f7f", color = "white", fontWeight = "Bold", fontSize = "14px"),
       aggregate = JS("function(values, rows) {
-        let totalArrived_AVG = 0
+        let totalArrived_MONDAY = 0
+        let totalArrived_TUESDAY = 0
+        let totalArrived_WEDNESDAY = 0
+        let totalArrived_THURSDAY = 0
         let totalArrived_FRIDAY = 0
         rows.forEach(function(row) {
-          totalArrived_AVG += row['Arrived_AVG']
+          totalArrived_MONDAY += row['Arrived_MONDAY']
+          totalArrived_TUESDAY += row['Arrived_TUESDAY']
+          totalArrived_WEDNESDAY += row['Arrived_WEDNESDAY']
+          totalArrived_THURSDAY += row['Arrived_THURSDAY']
           totalArrived_FRIDAY += row['Arrived_FRIDAY']
         })
-        return (totalArrived_FRIDAY - totalArrived_AVG) / totalArrived_AVG || '-'
+        return (totalArrived_FRIDAY - ((totalArrived_MONDAY + totalArrived_TUESDAY + totalArrived_WEDNESDAY + totalArrived_THURSDAY)/4)) /
+        ((totalArrived_MONDAY + totalArrived_TUESDAY + totalArrived_WEDNESDAY + totalArrived_THURSDAY)/4) || '-'
       }"),
       style = JS("function(rowInfo) {
         var value = rowInfo.row['Arrived_VAR_PERC']
@@ -1563,35 +1658,41 @@ reactable(
         return { color: color, fontFamily: 'calibri', fontWeight: 'bold'}
       }"),
       format = colFormat(percent = TRUE, digits = 1)),
-     
-     
-     
+
+
+
      md_cnt_AVG = colDef(
       name = "Mon-Thu Avg",
       maxWidth = 80,
       headerStyle = list(background = "#212070", color = "white", fontWeight = "Bold", fontSize = "14px"),
       aggregate = 'sum',
       format = colFormat(separators = TRUE, digits = 0)),
-     
+
      md_cnt_FRIDAY = colDef(
       name = "Fri",
       maxWidth = 80,
       headerStyle = list(background = "#212070", color = "white", fontWeight = "Bold", fontSize = "14px"),
       aggregate = 'sum',
       format = colFormat(separators = TRUE, digits = 0)),
-     
+
      md_cnt_VAR = colDef(
       name = "Var",
       maxWidth = 80,
       headerStyle = list(background = "#212070", color = "white", fontWeight = "Bold", fontSize = "14px"),
       aggregate = JS("function(values, rows) {
-        let totalmd_cnt_AVG = 0
+        let totalmd_cnt_MONDAY = 0
+        let totalmd_cnt_TUESDAY = 0
+        let totalmd_cnt_WEDNESDAY = 0
+        let totalmd_cnt_THURSDAY = 0
         let totalmd_cnt_FRIDAY = 0
         rows.forEach(function(row) {
-          totalmd_cnt_AVG += row['md_cnt_AVG']
+          totalmd_cnt_MONDAY += row['md_cnt_MONDAY']
+          totalmd_cnt_TUESDAY += row['md_cnt_TUESDAY']
+          totalmd_cnt_WEDNESDAY += row['md_cnt_WEDNESDAY']
+          totalmd_cnt_THURSDAY += row['md_cnt_THURSDAY']
           totalmd_cnt_FRIDAY += row['md_cnt_FRIDAY']
         })
-        return (totalmd_cnt_FRIDAY - totalmd_cnt_AVG) || '-'
+        return (totalmd_cnt_FRIDAY - ((totalmd_cnt_MONDAY + totalmd_cnt_TUESDAY + totalmd_cnt_WEDNESDAY + totalmd_cnt_THURSDAY)/4)) || '-'
       }"),
       style = JS("function(rowInfo) {
         var value = rowInfo.row['md_cnt_VAR']
@@ -1603,19 +1704,26 @@ reactable(
         return { color: color, fontFamily: 'calibri', fontWeight: 'bold'}
       }"),
       format = colFormat(separators = TRUE, digits = 0)),
-     
+
      md_cnt_VAR_PERC = colDef(
       name = "% Var",
       maxWidth = 80,
       headerStyle = list(background = "#212070", color = "white", fontWeight = "Bold", fontSize = "14px"),
       aggregate = JS("function(values, rows) {
-        let totalmd_cnt_AVG = 0
+       let totalmd_cnt_MONDAY = 0
+        let totalmd_cnt_TUESDAY = 0
+        let totalmd_cnt_WEDNESDAY = 0
+        let totalmd_cnt_THURSDAY = 0
         let totalmd_cnt_FRIDAY = 0
         rows.forEach(function(row) {
-          totalmd_cnt_AVG += row['md_cnt_AVG']
+          totalmd_cnt_MONDAY += row['md_cnt_MONDAY']
+          totalmd_cnt_TUESDAY += row['md_cnt_TUESDAY']
+          totalmd_cnt_WEDNESDAY += row['md_cnt_WEDNESDAY']
+          totalmd_cnt_THURSDAY += row['md_cnt_THURSDAY']
           totalmd_cnt_FRIDAY += row['md_cnt_FRIDAY']
         })
-        return (totalmd_cnt_FRIDAY - totalmd_cnt_AVG) / totalmd_cnt_AVG || '-'
+        return (totalmd_cnt_FRIDAY - ((totalmd_cnt_MONDAY + totalmd_cnt_TUESDAY + totalmd_cnt_WEDNESDAY + totalmd_cnt_THURSDAY)/4)) /
+        ((totalmd_cnt_MONDAY + totalmd_cnt_TUESDAY + totalmd_cnt_WEDNESDAY + totalmd_cnt_THURSDAY)/4) || '-'
       }"),
       style = JS("function(rowInfo) {
         var value = rowInfo.row['md_cnt_VAR_PERC']
@@ -1627,35 +1735,41 @@ reactable(
         return { color: color, fontFamily: 'calibri', fontWeight: 'bold'}
       }"),
       format = colFormat(percent = TRUE, digits = 1)),
-     
-     
-     
+
+
+
      session_cnt_AVG = colDef(
       name = "Mon-Thu Avg",
       maxWidth = 80,
       headerStyle = list(background = "#d80b8c", color = "white", fontWeight = "Bold", fontSize = "14px"),
       aggregate = 'sum',
       format = colFormat(separators = TRUE, digits = 0)),
-     
+
      session_cnt_FRIDAY = colDef(
       name = "Fri",
       maxWidth = 80,
       headerStyle = list(background = "#d80b8c", color = "white", fontWeight = "Bold", fontSize = "14px"),
       aggregate = 'sum',
       format = colFormat(separators = TRUE, digits = 0)),
-     
+
      session_cnt_VAR = colDef(
       name = "Var",
       maxWidth = 80,
       headerStyle = list(background = "#d80b8c", color = "white", fontWeight = "Bold", fontSize = "14px"),
       aggregate = JS("function(values, rows) {
-        let totalsession_cnt_AVG = 0
+        let totalsession_cnt_MONDAY = 0
+        let totalsession_cnt_TUESDAY = 0
+        let totalsession_cnt_WEDNESDAY = 0
+        let totalsession_cnt_THURSDAY = 0
         let totalsession_cnt_FRIDAY = 0
         rows.forEach(function(row) {
-          totalsession_cnt_AVG += row['session_cnt_AVG']
+          totalsession_cnt_MONDAY += row['session_cnt_MONDAY']
+          totalsession_cnt_TUESDAY += row['session_cnt_TUESDAY']
+          totalsession_cnt_WEDNESDAY += row['session_cnt_WEDNESDAY']
+          totalsession_cnt_THURSDAY += row['session_cnt_THURSDAY']
           totalsession_cnt_FRIDAY += row['session_cnt_FRIDAY']
         })
-        return (totalsession_cnt_FRIDAY - totalsession_cnt_AVG) || '-'
+        return (totalsession_cnt_FRIDAY - ((totalsession_cnt_MONDAY + totalsession_cnt_TUESDAY + totalsession_cnt_WEDNESDAY + totalsession_cnt_THURSDAY)/4)) || '-'
       }"),
       style = JS("function(rowInfo) {
         var value = rowInfo.row['session_cnt_VAR']
@@ -1667,19 +1781,26 @@ reactable(
         return { color: color, fontFamily: 'calibri', fontWeight: 'bold'}
       }"),
       format = colFormat(separators = TRUE, digits = 0)),
-     
+
      session_cnt_VAR_PERC = colDef(
       name = "% Var",
       maxWidth = 80,
       headerStyle = list(background = "#d80b8c", color = "white", fontWeight = "Bold", fontSize = "14px"),
       aggregate = JS("function(values, rows) {
-        let totalsession_cnt_AVG = 0
+        let totalsession_cnt_MONDAY = 0
+        let totalsession_cnt_TUESDAY = 0
+        let totalsession_cnt_WEDNESDAY = 0
+        let totalsession_cnt_THURSDAY = 0
         let totalsession_cnt_FRIDAY = 0
         rows.forEach(function(row) {
-          totalsession_cnt_AVG += row['session_cnt_AVG']
+          totalsession_cnt_MONDAY += row['session_cnt_MONDAY']
+          totalsession_cnt_TUESDAY += row['session_cnt_TUESDAY']
+          totalsession_cnt_WEDNESDAY += row['session_cnt_WEDNESDAY']
+          totalsession_cnt_THURSDAY += row['session_cnt_THURSDAY']
           totalsession_cnt_FRIDAY += row['session_cnt_FRIDAY']
         })
-        return (totalsession_cnt_FRIDAY - totalsession_cnt_AVG) / totalsession_cnt_AVG || '-'
+        return (totalsession_cnt_FRIDAY - ((totalsession_cnt_MONDAY + totalsession_cnt_TUESDAY + totalsession_cnt_WEDNESDAY + totalsession_cnt_THURSDAY)/4)) /
+        ((totalsession_cnt_MONDAY + totalsession_cnt_TUESDAY + totalsession_cnt_WEDNESDAY + totalsession_cnt_THURSDAY)/4) || '-'
       }"),
       style = JS("function(rowInfo) {
         var value = rowInfo.row['session_cnt_VAR_PERC']
@@ -1691,34 +1812,40 @@ reactable(
         return { color: color, fontFamily: 'calibri', fontWeight: 'bold'}
       }"),
       format = colFormat(percent = TRUE, digits = 1)),
-     
-     
+
+
      unfilled_cnt_AVG = colDef(
       name = "Mon-Thu Avg",
       maxWidth = 80,
       headerStyle = list(background = "#00aeef", color = "white", fontWeight = "Bold", fontSize = "14px"),
       aggregate = 'sum',
       format = colFormat(separators = TRUE, digits = 0)),
-     
+
      unfilled_cnt_FRIDAY = colDef(
       name = "Fri",
       maxWidth = 80,
       headerStyle = list(background = "#00aeef", color = "white", fontWeight = "Bold", fontSize = "14px"),
       aggregate = 'sum',
       format = colFormat(separators = TRUE, digits = 0)),
-     
+
      unfilled_cnt_VAR = colDef(
       name = "Var",
       maxWidth = 80,
       headerStyle = list(background = "#00aeef", color = "white", fontWeight = "Bold", fontSize = "14px"),
       aggregate = JS("function(values, rows) {
-        let totalunfilled_cnt_AVG = 0
+        let totalunfilled_cnt_MONDAY = 0
+        let totalunfilled_cnt_TUESDAY = 0
+        let totalunfilled_cnt_WEDNESDAY = 0
+        let totalunfilled_cnt_THURSDAY = 0
         let totalunfilled_cnt_FRIDAY = 0
         rows.forEach(function(row) {
-          totalunfilled_cnt_AVG += row['unfilled_cnt_AVG']
+          totalunfilled_cnt_MONDAY += row['unfilled_cnt_MONDAY']
+          totalunfilled_cnt_TUESDAY += row['unfilled_cnt_TUESDAY']
+          totalunfilled_cnt_WEDNESDAY += row['unfilled_cnt_WEDNESDAY']
+          totalunfilled_cnt_THURSDAY += row['unfilled_cnt_THURSDAY']
           totalunfilled_cnt_FRIDAY += row['unfilled_cnt_FRIDAY']
         })
-        return (totalunfilled_cnt_FRIDAY - totalunfilled_cnt_AVG) || '-'
+        return (totalunfilled_cnt_FRIDAY - ((totalunfilled_cnt_MONDAY + totalunfilled_cnt_TUESDAY + totalunfilled_cnt_WEDNESDAY + totalunfilled_cnt_THURSDAY)/4)) || '-'
       }"),
       style = JS("function(rowInfo) {
         var value = rowInfo.row['unfilled_cnt_VAR']
@@ -1730,19 +1857,26 @@ reactable(
         return { color: color, fontFamily: 'calibri', fontWeight: 'bold'}
       }"),
       format = colFormat(separators = TRUE, digits = 0)),
-     
+
      unfilled_cnt_VAR_PERC = colDef(
       name = "% Var",
       maxWidth = 80,
       headerStyle = list(background = "#00aeef", color = "white", fontWeight = "Bold", fontSize = "14px"),
       aggregate = JS("function(values, rows) {
-        let totalunfilled_cnt_AVG = 0
+        let totalunfilled_cnt_MONDAY = 0
+        let totalunfilled_cnt_TUESDAY = 0
+        let totalunfilled_cnt_WEDNESDAY = 0
+        let totalunfilled_cnt_THURSDAY = 0
         let totalunfilled_cnt_FRIDAY = 0
         rows.forEach(function(row) {
-          totalunfilled_cnt_AVG += row['unfilled_cnt_AVG']
+          totalunfilled_cnt_MONDAY += row['unfilled_cnt_MONDAY']
+          totalunfilled_cnt_TUESDAY += row['unfilled_cnt_TUESDAY']
+          totalunfilled_cnt_WEDNESDAY += row['unfilled_cnt_WEDNESDAY']
+          totalunfilled_cnt_THURSDAY += row['unfilled_cnt_THURSDAY']
           totalunfilled_cnt_FRIDAY += row['unfilled_cnt_FRIDAY']
         })
-        return (totalunfilled_cnt_FRIDAY - totalunfilled_cnt_AVG) / totalunfilled_cnt_AVG || '-'
+        return (totalunfilled_cnt_FRIDAY - ((totalunfilled_cnt_MONDAY + totalunfilled_cnt_TUESDAY + totalunfilled_cnt_WEDNESDAY + totalunfilled_cnt_THURSDAY)/4)) /
+        ((totalunfilled_cnt_MONDAY + totalunfilled_cnt_TUESDAY + totalunfilled_cnt_WEDNESDAY + totalunfilled_cnt_THURSDAY)/4) || '-'
       }"),
       style = JS("function(rowInfo) {
         var value = rowInfo.row['unfilled_cnt_VAR_PERC']
@@ -1754,38 +1888,69 @@ reactable(
         return { color: color, fontFamily: 'calibri', fontWeight: 'bold'}
       }"),
       format = colFormat(percent = TRUE, digits = 1)),
-     
-     
-     
-     No_Show_Rate_AVG = colDef(
-      name = "Mon-Thu Avg",
-      maxWidth = 80,
-      headerStyle = list(background = "#a5a7a5", color = "white", fontWeight = "Bold", fontSize = "14px"),
-      aggregate = JS("function(values, rows) {
-        let totalNo_Show_AVG = 0
-        let totalCanceled_AVG = 0
-        let totalRescheduled_AVG = 0
-        let totalArrived_AVG = 0
-        rows.forEach(function(row) {
-          totalNo_Show_AVG += row['No_Show_AVG']
-          totalCanceled_AVG += row['Canceled_AVG']
-          totalRescheduled_AVG += row['Rescheduled_AVG']
-          totalArrived_AVG += row['Arrived_AVG']
-        })
-        return (totalNo_Show_AVG + totalCanceled_AVG + totalRescheduled_AVG) / (totalNo_Show_AVG + totalCanceled_AVG + totalRescheduled_AVG + totalArrived_AVG) || '-'
-      }"),
-      style = JS("function(rowInfo) {
-        var value = rowInfo.row['No_Show_Rate_AVG']
-        if (value > 0) {
-          var color = '#e00000'
-        } else {
-          var color = '#008000'
-        }
-        return { color: color, fontFamily: 'calibri', fontWeight: 'bold'}
-      }"),
-      format = colFormat(percent = TRUE, digits = 1)),
-     
-     
+
+
+
+No_Show_Rate_AVG = colDef(
+ name = "Mon-Thu Avg",
+ maxWidth = 80,
+ headerStyle = list(background = "#a5a7a5", color = "white", fontWeight = "Bold", fontSize = "14px"),
+ aggregate = JS("function(values, rows) {
+   let totalNo_Show_MONDAY = 0
+   let totalNo_Show_TUESDAY = 0
+   let totalNo_Show_WEDNESDAY = 0
+   let totalNo_Show_THURSDAY = 0
+   let totalCanceled_MONDAY = 0
+   let totalCanceled_TUESDAY = 0
+   let totalCanceled_WEDNESDAY = 0
+   let totalCanceled_THURSDAY = 0
+   let totalRescheduled_MONDAY = 0
+   let totalRescheduled_TUESDAY = 0
+   let totalRescheduled_WEDNESDAY = 0
+   let totalRescheduled_THURSDAY = 0
+   let totalArrived_MONDAY = 0
+   let totalArrived_TUESDAY = 0
+   let totalArrived_WEDNESDAY = 0
+   let totalArrived_THURSDAY = 0
+   rows.forEach(function(row) {
+     totalNo_Show_MONDAY += row['No_Show_MONDAY']
+     totalNo_Show_TUESDAY += row['No_Show_TUESDAY']
+     totalNo_Show_WEDNESDAY += row['No_Show_WEDNESDAY']
+     totalNo_Show_THURSDAY += row['No_Show_THURSDAY']
+     totalCanceled_MONDAY += row['Canceled_MONDAY']
+     totalCanceled_TUESDAY += row['Canceled_TUESDAY']
+     totalCanceled_WEDNESDAY += row['Canceled_WEDNESDAY']
+     totalCanceled_THURSDAY += row['Canceled_THURSDAY']
+     totalRescheduled_MONDAY += row['Rescheduled_MONDAY']
+     totalRescheduled_TUESDAY += row['Rescheduled_TUESDAY']
+     totalRescheduled_WEDNESDAY += row['Rescheduled_WEDNESDAY']
+     totalRescheduled_THURSDAY += row['Rescheduled_THURSDAY']
+     totalArrived_MONDAY += row['Arrived_MONDAY']
+     totalArrived_TUESDAY += row['Arrived_TUESDAY']
+     totalArrived_WEDNESDAY += row['Arrived_WEDNESDAY']
+     totalArrived_THURSDAY += row['Arrived_THURSDAY']
+   })
+   return (totalNo_Show_MONDAY + totalNo_Show_TUESDAY + totalNo_Show_WEDNESDAY + totalNo_Show_THURSDAY +
+           totalCanceled_MONDAY + totalCanceled_TUESDAY + totalCanceled_WEDNESDAY + totalCanceled_THURSDAY +
+           totalRescheduled_MONDAY + totalRescheduled_TUESDAY + totalRescheduled_WEDNESDAY + totalRescheduled_THURSDAY) /
+           (totalNo_Show_MONDAY + totalNo_Show_TUESDAY + totalNo_Show_WEDNESDAY + totalNo_Show_THURSDAY +
+           totalCanceled_MONDAY + totalCanceled_TUESDAY + totalCanceled_WEDNESDAY + totalCanceled_THURSDAY +
+           totalRescheduled_MONDAY + totalRescheduled_TUESDAY + totalRescheduled_WEDNESDAY + totalRescheduled_THURSDAY +
+           totalArrived_MONDAY + totalArrived_TUESDAY + totalArrived_WEDNESDAY + totalArrived_THURSDAY) || '-'
+
+ }"),
+ style = JS("function(rowInfo) {
+   var value = rowInfo.row['No_Show_Rate_AVG']
+   if (value > 0) {
+     var color = '#e00000'
+   } else {
+     var color = '#008000'
+   }
+   return { color: color, fontFamily: 'calibri', fontWeight: 'bold'}
+ }"),
+ format = colFormat(percent = TRUE, digits = 1)),
+
+
      No_Show_Rate_FRIDAY = colDef(
       name = "Fri",
       maxWidth = 80,
@@ -1801,7 +1966,7 @@ reactable(
           totalRescheduled_FRIDAY += row['Rescheduled_FRIDAY']
           totalArrived_FRIDAY += row['Arrived_FRIDAY']
         })
-        return (totalNo_Show_FRIDAY + totalCanceled_FRIDAY + totalRescheduled_FRIDAY) / 
+        return (totalNo_Show_FRIDAY + totalCanceled_FRIDAY + totalRescheduled_FRIDAY) /
         (totalNo_Show_FRIDAY + totalCanceled_FRIDAY + totalRescheduled_FRIDAY + totalArrived_FRIDAY) || '-'
       }"),
       style = JS("function(rowInfo) {
@@ -1814,7 +1979,8 @@ reactable(
         return { color: color, fontFamily: 'calibri', fontWeight: 'bold'}
       }"),
       format = colFormat(percent = TRUE, digits = 1)),
-     
+
+     appt_year = colDef(show =F),
      holiday = colDef(show =F),
      DEPARTMENT_ID = colDef(show =F),
      PROV_ID = colDef(show =F),
