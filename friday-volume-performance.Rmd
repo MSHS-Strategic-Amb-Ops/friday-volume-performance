@@ -470,7 +470,6 @@ date_end <- as.Date(Sys.Date() - 1)
 date_end <- date_end - as.integer(format(date_end, "%u"))
 
 
-
 ## Scheduled Volume Comparison -------------------------------------------------
 
 scheduled_volume <- access_raw_tbl %>%
@@ -487,12 +486,12 @@ scheduled_volume <- access_raw_tbl %>%
   #                                 c("Adolescent Medicine", "Community and Preventive Medicine",
   #                                   "Family Medicine", "Internal Medicine", "Pediatrics", "Geriatrics", "Gerontology", "Urgent Care"), "Primary Care", "Specialty")) %>%
   filter((CONTACT_DATE >= TO_DATE(date_start , "YYYY-MM-DD HH24:MI:SS") & 
-                                    CONTACT_DATE <= TO_DATE(date_end, "YYYY-MM-DD HH24:MI:SS") & 
+                                    CONTACT_DATE <= TO_DATE(report_run_date, "YYYY-MM-DD HH24:MI:SS") & 
              (DERIVED_STATUS_DESC == "Arrived" |
                 DERIVED_STATUS_DESC == "No Show" |
                 (DERIVED_STATUS_DESC == "Canceled"  & cancel_lead_days <= 1) |
                 (DERIVED_STATUS_DESC == "Rescheduled" & cancel_lead_days <= 1))) |
-           (DERIVED_STATUS_DESC == "Scheduled" & (CONTACT_DATE > TO_DATE(date_end, "YYYY-MM-DD HH24:MI:SS") & year(CONTACT_DATE) <= 2026))) %>%
+           (DERIVED_STATUS_DESC == "Scheduled" & (CONTACT_DATE > TO_DATE(report_run_date, "YYYY-MM-DD HH24:MI:SS") & year(CONTACT_DATE) <= 2026))) %>%
   mutate(DERIVED_STATUS_DESC = "Scheduled") %>%
   mutate(appt_year = year(CONTACT_DATE),
          appt_month = month(CONTACT_DATE),
@@ -505,10 +504,14 @@ scheduled_volume <- access_raw_tbl %>%
   # filter(CONTACT_DATE >= TO_DATE(date_start , "YYYY-MM-DD HH24:MI:SS")) %>%
   # filter(CONTACT_DATE <= TO_DATE(date_end , "YYYY-MM-DD HH24:MI:SS")) %>%
   # dplyr::select(SITE, DEPT_SPECIALTY_NAME, DEPARTMENT_NAME, DEPARTMENT_ID, PROV_NAME_WID, PAT_ENC_CSN_ID, APPT_STATUS_NAME, CANCEL_LEAD_HOURS, CANCEL_INITIATOR) %>%
-  group_by(SITE, DEPT_SPECIALTY_NAME, DEPARTMENT_NAME, DEPARTMENT_ID, PROV_ID, NPI, PROV_NAME_WID, PROV_TYPE, 
+  group_by(SITE, DEPT_SPECIALTY_NAME, DEPARTMENT_NAME, DEPARTMENT_ID, PROV_ID, NPI, PROV_NAME_WID, PROV_TYPE,
            appt_week, appt_day,
            # appt_day, CONTACT_DATE,
            DERIVED_STATUS_DESC) %>%
+    # group_by(
+    #        appt_week, appt_day,
+    #        # appt_day, CONTACT_DATE,
+    #        DERIVED_STATUS_DESC) %>%
   summarise(total = n()) %>%
   collect() %>%
   pivot_wider(names_from = c("DERIVED_STATUS_DESC", "appt_day"),
@@ -550,7 +553,7 @@ volume_no_show <- access_raw_tbl %>%
   mutate(visit_type = ifelse(is.na(VISIT_GROUP_NUM), "ESTABLISHED", "NEW")) %>%
   mutate(lead_14days = ifelse(lead_days <= 14, "lead_14days", "lead_14days_more")) %>%
   filter(CONTACT_DATE >= TO_DATE(date_start , "YYYY-MM-DD HH24:MI:SS")) %>%
-  filter(CONTACT_DATE <= TO_DATE(date_end , "YYYY-MM-DD HH24:MI:SS")) %>%
+  filter(CONTACT_DATE <= TO_DATE(report_run_date , "YYYY-MM-DD HH24:MI:SS")) %>%
   # dplyr::select(SITE, DEPT_SPECIALTY_NAME, DEPARTMENT_NAME, DEPARTMENT_ID, PROV_NAME_WID, PAT_ENC_CSN_ID, APPT_STATUS_NAME, CANCEL_LEAD_HOURS, CANCEL_INITIATOR) %>%
   group_by(SITE, DEPT_SPECIALTY_NAME, DEPARTMENT_NAME, DEPARTMENT_ID, PROV_ID, NPI, PROV_NAME_WID, PROV_TYPE, 
            appt_week, appt_day,
@@ -581,12 +584,12 @@ sessions <- access_raw_tbl %>%
   filter(CONTACT_DATE <= TO_DATE(date_end , "YYYY-MM-DD HH24:MI:SS")) %>%
   mutate(cancel_lead_days = APPT_DTTM - APPT_CANC_DTTM) %>%
   filter((CONTACT_DATE >= TO_DATE(date_start , "YYYY-MM-DD HH24:MI:SS") & 
-                                    CONTACT_DATE <= TO_DATE(date_end, "YYYY-MM-DD HH24:MI:SS") & 
+                                    CONTACT_DATE <= TO_DATE(report_run_date, "YYYY-MM-DD HH24:MI:SS") & 
              (DERIVED_STATUS_DESC == "Arrived" |
                 DERIVED_STATUS_DESC == "No Show" |
                 (DERIVED_STATUS_DESC == "Canceled"  & cancel_lead_days <= 1) |
                 (DERIVED_STATUS_DESC == "Rescheduled" & cancel_lead_days <= 1))) |
-           (DERIVED_STATUS_DESC == "Scheduled" & (CONTACT_DATE > TO_DATE(date_end, "YYYY-MM-DD HH24:MI:SS") & year(CONTACT_DATE) <= 2026))) %>%
+           (DERIVED_STATUS_DESC == "Scheduled" & (CONTACT_DATE > TO_DATE(report_run_date, "YYYY-MM-DD HH24:MI:SS") & year(CONTACT_DATE) <= 2026))) %>%
   mutate(appt_year = year(CONTACT_DATE),
          appt_month = month(CONTACT_DATE),
          appt_week = sql("TRUNC(CONTACT_DATE, 'IW')"),
@@ -618,12 +621,12 @@ physicians <- access_raw_tbl %>%
   filter(CONTACT_DATE <= TO_DATE(date_end , "YYYY-MM-DD HH24:MI:SS")) %>%
   mutate(cancel_lead_days = APPT_DTTM - APPT_CANC_DTTM) %>%
   filter((CONTACT_DATE >= TO_DATE(date_start , "YYYY-MM-DD HH24:MI:SS") & 
-                                    CONTACT_DATE <= TO_DATE(date_end, "YYYY-MM-DD HH24:MI:SS") & 
+                                    CONTACT_DATE <= TO_DATE(report_run_date, "YYYY-MM-DD HH24:MI:SS") & 
              (DERIVED_STATUS_DESC == "Arrived" |
                 DERIVED_STATUS_DESC == "No Show" |
                 (DERIVED_STATUS_DESC == "Canceled"  & cancel_lead_days <= 1) |
                 (DERIVED_STATUS_DESC == "Rescheduled" & cancel_lead_days <= 1))) |
-           (DERIVED_STATUS_DESC == "Scheduled" & (CONTACT_DATE > TO_DATE(date_end, "YYYY-MM-DD HH24:MI:SS") & year(CONTACT_DATE) <= 2026))) %>%
+           (DERIVED_STATUS_DESC == "Scheduled" & (CONTACT_DATE > TO_DATE(report_run_date, "YYYY-MM-DD HH24:MI:SS") & year(CONTACT_DATE) <= 2026))) %>%
   mutate(appt_year = year(CONTACT_DATE),
          appt_month = month(CONTACT_DATE),
          appt_week = sql("TRUNC(CONTACT_DATE, 'IW')"),
@@ -656,7 +659,7 @@ unfilled_slots <- tbl(conn2, "V_AVAILABILITY") %>%
   # filter(month(SLOT_BEGIN_TIME) == 1) %>%
   # left_join(clarity_ser_2_tbl %>% dplyr::select(PROV_ID, NPI)) %>%
   filter(SLOT_BEGIN_TIME >= TO_DATE(date_start , "YYYY-MM-DD HH24:MI:SS")) %>%
-  filter(SLOT_BEGIN_TIME <= 2026) %>%
+  filter(year(SLOT_BEGIN_TIME) <= 2026) %>%
   mutate(slot_date = sql("TRUNC(SLOT_BEGIN_TIME)"),
          slot_year = year(SLOT_BEGIN_TIME),
          slot_month = month(SLOT_BEGIN_TIME),
