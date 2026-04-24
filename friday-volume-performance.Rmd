@@ -798,6 +798,12 @@ scheduled_volume_month <- access_raw_tbl %>%
               values_fill = 0)
 
 
+scheduled_volume_month <- scheduled_volume_month %>%
+  mutate(Scheduled_AVG = sum(Scheduled_MONDAY, Scheduled_TUESDAY, Scheduled_WEDNESDAY, Scheduled_THURSDAY)/4) %>%
+  mutate(Scheduled_VAR = Scheduled_FRIDAY - Scheduled_AVG,
+         Scheduled_VAR_PERC = Scheduled_VAR/Scheduled_AVG)
+
+
 ## Arrived Volume and No Show Rate Comparison ----------------------------------
 
 volume_no_show_month <- access_raw_tbl %>%
@@ -965,8 +971,8 @@ unfilled_slots_month <- tbl(conn2, "V_AVAILABILITY") %>%
 
 
 ## Merged Data -----------------------------------------------------------------
-merged_data_month <- full_join(volume_no_show_month, sessions_month)
-merged_data_month <- full_join(volume_no_show_month, sessions_month)
+merged_data_month <- full_join(scheduled_volume_month, volume_no_show_month)
+merged_data_month <- full_join(merged_data_month, sessions_month)
 merged_data_month <- full_join(merged_data_month, physicians_month)
 merged_data_month <- left_join(merged_data_month, unfilled_slots_month,
                          by = c("DEPARTMENT_ID" = "DEPARTMENT_ID",
@@ -988,6 +994,8 @@ merged_data_month <- merged_data_month %>%
 
 col_order <- c("appt_year", "appt_month", 
                "SITE", "STANDARD_ADDRESS",  "DEPT_SPECIALTY_NAME", "DEPARTMENT_NAME", "DEPARTMENT_ID", "PROV_TYPE", "PROV_ID", "NPI", "PROV_NAME_WID",
+               "Scheduled_AVG", "Scheduled_MONDAY", "Scheduled_TUESDAY", "Scheduled_WEDNESDAY", "Scheduled_THURSDAY", "Scheduled_FRIDAY", "Scheduled_SATURDAY", "Scheduled_SUNDAY",
+               "Scheduled_VAR", "Scheduled_VAR_PERC",
                "Arrived_AVG", "Arrived_MONDAY", "Arrived_TUESDAY", "Arrived_WEDNESDAY", "Arrived_THURSDAY", "Arrived_FRIDAY", "Arrived_SATURDAY", "Arrived_SUNDAY",
                "Arrived_VAR", "Arrived_VAR_PERC",
                "md_cnt_AVG", "md_cnt_MONDAY", "md_cnt_TUESDAY", "md_cnt_WEDNESDAY", "md_cnt_THURSDAY", "md_cnt_FRIDAY", "md_cnt_SATURDAY", "md_cnt_SUNDAY",
@@ -1734,7 +1742,7 @@ reactable(
     colGroup(name = "", columns = c("SITE","STANDARD_ADDRESS","DEPT_SPECIALTY_NAME","DEPARTMENT_NAME","PROV_TYPE", "PROV_NAME_WID"),
              headerStyle = list(color = "black", fontSize = "15px")),
     colGroup(name = paste0("Scheduled Visits"),
-             columns = c("Scheduled_AVG", "Scheduled_FRIDAY", "Scheduled_VAR", "Scheduled_VAR_PERC"),
+             columns = c("Scheduled_AVG", "Scheduled_FRIDAY", "Scheduled_VAR", "Scheduled_VAR_PERC")),
     colGroup(name = paste0("Arrived Visits"),
              columns = c("Arrived_AVG", "Arrived_FRIDAY", "Arrived_VAR", "Arrived_VAR_PERC"),
              headerStyle = list(background = "#7f7f7f", color = "white", fontSize = "15px")),
