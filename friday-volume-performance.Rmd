@@ -580,8 +580,8 @@ volume_no_show <- volume_no_show %>%
 
 ## Session Count ---------------------------------------------------------------
 sessions <- access_raw_tbl %>%
-  filter(CONTACT_DATE >= TO_DATE(date_start , "YYYY-MM-DD HH24:MI:SS")) %>%
-  filter(CONTACT_DATE <= TO_DATE(date_end , "YYYY-MM-DD HH24:MI:SS")) %>%
+  # filter(CONTACT_DATE >= TO_DATE(date_start , "YYYY-MM-DD HH24:MI:SS")) %>%
+  # filter(CONTACT_DATE <= TO_DATE(date_end , "YYYY-MM-DD HH24:MI:SS")) %>%
   mutate(cancel_lead_days = APPT_DTTM - APPT_CANC_DTTM) %>%
   filter((CONTACT_DATE >= TO_DATE(date_start , "YYYY-MM-DD HH24:MI:SS") & 
                                     CONTACT_DATE <= TO_DATE(report_run_date, "YYYY-MM-DD HH24:MI:SS") & 
@@ -603,6 +603,7 @@ sessions <- access_raw_tbl %>%
   ) %>%
   mutate(total = ifelse(first_last_appt_hour<2,0, ifelse(first_last_appt_hour<5,1, ifelse(first_last_appt_hour<9,2,3)))) %>%
   group_by(DEPARTMENT_ID, PROV_ID, appt_week, appt_day) %>%
+  # group_by(appt_week, appt_day) %>%
   summarise(total = sum(total, na.rm = T)) %>%
   collect() %>%
   mutate(session_cnt = "session_cnt") %>%
@@ -617,8 +618,8 @@ sessions <- access_raw_tbl %>%
 
 ## Physician Count ---------------------------------------------------------------
 physicians <- access_raw_tbl %>%
-  filter(CONTACT_DATE >= TO_DATE(date_start , "YYYY-MM-DD HH24:MI:SS")) %>%
-  filter(CONTACT_DATE <= TO_DATE(date_end , "YYYY-MM-DD HH24:MI:SS")) %>%
+  # filter(CONTACT_DATE >= TO_DATE(date_start , "YYYY-MM-DD HH24:MI:SS")) %>%
+  # filter(CONTACT_DATE <= TO_DATE(date_end , "YYYY-MM-DD HH24:MI:SS")) %>%
   mutate(cancel_lead_days = APPT_DTTM - APPT_CANC_DTTM) %>%
   filter((CONTACT_DATE >= TO_DATE(date_start , "YYYY-MM-DD HH24:MI:SS") & 
                                     CONTACT_DATE <= TO_DATE(report_run_date, "YYYY-MM-DD HH24:MI:SS") & 
